@@ -1,0 +1,42 @@
+---
+//src/pages/workspace/[workspaceId]/boards.astro
+export const prerender = false;
+import Layout from '../../../layouts/Layout.astro';
+const { workspaceId } = Astro.params;
+---
+<Layout title="Tableros del Espacio de Trabajo">
+  <main class="p-8">
+    <div class="mb-6">
+      <a href="/dashboard" class="text-blue-500 hover:underline">
+        &larr; Volver a mis Espacios de Trabajo
+      </a>
+    </div>
+    
+    <h1 id="workspace-name" class="text-3xl font-bold mb-6">Cargando...</h1>
+
+    <form id="create-board-form" class="mb-6 flex gap-2">
+      <input 
+        type="text" 
+        id="board-name" 
+        placeholder="Nombre del nuevo tablero" 
+        class="flex-grow px-3 py-2 border rounded-lg" 
+        required
+      />
+      <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        Crear Tablero
+      </button>
+    </form>
+
+    <div id="boards-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <p id="loading-message">Cargando tableros...</p>
+    </div>
+  </main>
+
+  {/* Este script ahora es muy simple. Solo importa la lógica 
+    del archivo externo y la ejecuta.
+  */}
+  <script type="module" define:vars={{ workspaceId }}>
+    import initBoards from '/src/scripts/boards.ts';
+    initBoards(workspaceId);
+  </script>
+</Layout>

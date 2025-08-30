@@ -1,0 +1,13 @@
+---
+//src/components/workspace/WorkspaceCard.astro
+// 1. Recibimos las props que nos pasa la página dashboard.astro
+// Mejora: podríamos aceptar un href opcional para rutas personalizadas, por ahora construimos /workspace/{id}
+const { id, title, description } = Astro.props;
+---
+
+<a href={`/workspace/${id}`}>
+    <div class="border p-2 rounded-md shadow-md">
+        <h2>{title}</h2>
+        <p>{description}</p>
+    </div>
+</a>

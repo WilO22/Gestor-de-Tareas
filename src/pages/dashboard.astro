@@ -1,0 +1,95 @@
+---
+//src/pages/dashboard.astro
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Dashboard de Proyectos">
+  <main class="p-8">
+    <h1 class="text-3xl font-bold mb-6">
+      Mis Espacios de Trabajo
+    </h1>
+
+    <form id="create-workspace-form" class="mb-6 flex gap-2">
+      <input 
+        type="text" 
+        id="workspace-name" 
+        placeholder="Nombre del nuevo espacio de trabajo" 
+        class="flex-grow px-3 py-2 border rounded-lg" 
+        required
+      />
+      <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+        Crear
+      </button>
+    </form>
+
+    <div id="workspaces-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <p id="loading-message">Cargando espacios de trabajo...</p>
+    </div>
+  </main>
+
+  <script>
+  import { auth } from '../firebase/auth';
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { db } from '../firebase/client';
+  import { collection, query, where, getDocs } from 'firebase/firestore';
+  // Importamos nuestra nueva función para crear
+  import { createWorkspace } from '../firebase/api';
+  import type { Workspace } from '../types/domain';
+
+  // --- OBTENEMOS TODOS LOS ELEMENTOS DEL HTML ---
+  const workspacesGrid = document.getElementById('workspaces-grid');
+  const createForm = document.getElementById('create-workspace-form');
+  const workspaceNameInput = document.getElementById('workspace-name') as HTMLInputElement;
+
+  // --- FUNCIÓN REUTILIZABLE PARA MOSTRAR WORKSPACES ---
+  async function fetchAndRenderWorkspaces(userId: string) {
+    if (!workspacesGrid) return; // Salimos si el grid no existe
+
+    const q = query(collection(db, "workspaces"), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    workspacesGrid.innerHTML = ''; // Limpiamos el contenido actual
+
+    if (querySnapshot.empty) {
+      workspacesGrid.innerHTML = '<p>Aún no tienes espacios de trabajo. ¡Crea uno!</p>';
+    } else {
+      querySnapshot.forEach((doc) => {
+        const workspace = { id: doc.id, ...doc.data() } as Workspace;
+        const cardHTML = `
+          <a href="/workspace/${workspace.id}/boards" class="block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all">
+            <h2 class="text-xl font-semibold">${workspace.name}</h2>
+            <p class="text-sm text-gray-600">${workspace.boards?.length || 0} tableros</p>
+          </a>
+        `;
+        workspacesGrid.innerHTML += cardHTML;
+      });
+    }
+  }
+
+  // --- LÓGICA PRINCIPAL ---
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // 1. Cuando el usuario carga la página, mostramos sus workspaces
+      fetchAndRenderWorkspaces(user.uid);
+
+      // 2. Preparamos el formulario de creación
+      createForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const workspaceName = workspaceNameInput.value;
+
+        if (workspaceName) {
+          // Llamamos a la función para crear en Firestore
+          await createWorkspace(workspaceName, user.uid);
+          // Limpiamos el campo de texto
+          workspaceNameInput.value = '';
+          // Volvemos a cargar y mostrar la lista para que aparezca el nuevo
+          fetchAndRenderWorkspaces(user.uid);
+        }
+      });
+    } else {
+      window.location.href = '/login';
+    }
+  });
+</script>
+
+  
+</Layout>

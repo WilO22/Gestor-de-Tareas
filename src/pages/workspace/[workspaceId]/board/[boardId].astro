@@ -1,0 +1,61 @@
+---
+//src/pages/workspace/[workspaceId]/board/[boardId].astro
+export const prerender = false;
+import Layout from '../../../../layouts/Layout.astro';
+const { workspaceId, boardId } = Astro.params;
+---
+
+<Layout title="Tablero">
+  <main class="p-8">
+    {/* Migas de pan: el nombre del workspace se resuelve en el cliente */}
+    <div class="mb-6">
+      <a href="/dashboard" class="text-blue-500 hover:underline">Espacios de Trabajo</a>
+      <span>/</span>
+      <a id="workspace-link" href={`/workspace/${workspaceId}/boards`} class="text-blue-500 hover:underline">Cargando...</a>
+    </div>
+
+    {/* Título del tablero: se actualiza en el cliente al leer Firebase */}
+    <h1 id="board-title" class="text-3xl font-bold mb-6">Cargando tablero...</h1>
+
+    {/* Contenedor de columnas. Se llena desde /src/scripts/board-page.ts */}
+    <div id="columns-container">
+      <p>Cargando columnas...</p>
+    </div>
+  </main>
+  
+  {/* Inicializamos la lógica de cliente con los IDs de la ruta */}
+  <script type="module" define:vars={{ workspaceId, boardId }}>
+    import initBoardPage from '/src/scripts/board-page.ts';
+    initBoardPage({ workspaceId, boardId });
+  </script>
+
+  <style>
+    .blue-background-class {
+      background-color: rgba(59, 130, 246, 0.2);
+      border-radius: 6px;
+      border: 1px dashed rgba(59, 130, 246, 0.5);
+      opacity: 0.3;
+    }
+    
+    /* 1. Ponemos la "mano abierta" ✋ por defecto en todas las tarjetas */
+  .task-list > div {
+    cursor: grab; /* Esto indica que el elemento es "agarrable" */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* 2. Forzamos la "mano cerrada" ✊ en el clon que arrastramos */
+  .sortable-fallback {
+    opacity: 0.7;
+    transform: rotate(3deg);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2);
+    cursor: grabbing !important; /* Le damos MÁXIMA prioridad */
+  }
+
+  /* 3. Forzamos la "mano cerrada" ✊ también en el elemento original mientras se arrastra */
+  .sortable-chosen {
+    cursor: grabbing !important; /* Le damos MÁXIMA prioridad */
+  }
+
+  </style>
+</Layout>

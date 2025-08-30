@@ -1,0 +1,21 @@
+{
+  "name": "gestorproyectos",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.12",
+    "astro": "^5.13.3",
+    "firebase": "^12.2.1",
+    "sortablejs": "^1.15.6",
+    "tailwindcss": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/sortablejs": "^1.15.8"
+  }
+}
