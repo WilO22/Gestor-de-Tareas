@@ -43,7 +43,6 @@ async function fetchAndRenderBoards(workspaceId: string) {
       const cardHTML = `
         <a href="/workspace/${workspaceId}/board/${board.id}" class="block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all">
           <h2 class="text-xl font-semibold">${board.name}</h2>
-          <p class="text-sm text-gray-600">${board.columns?.length || 0} columnas</p>
         </a>
       `;
       boardsGridEl.innerHTML += cardHTML;

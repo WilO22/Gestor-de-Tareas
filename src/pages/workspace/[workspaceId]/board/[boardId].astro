@@ -29,7 +29,11 @@ const { workspaceId, boardId } = Astro.params;
     initBoardPage({ workspaceId, boardId });
   </script>
 
-  <style>
+  <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
+    se generan dinámicamente en el cliente y no reciben el atributo de
+    "scoping" de Astro. Con is:global aseguras que las clases de Sortable
+    (.sortable-*, .blue-background-class) y .task-list apliquen correctamente. -->
+  <style is:global>
     .blue-background-class {
       background-color: rgba(59, 130, 246, 0.2);
       border-radius: 6px;
