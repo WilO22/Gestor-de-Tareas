@@ -30,10 +30,8 @@ import WorkspaceCard from '../components/workspace/WorkspaceCard.astro';
   <script>
   import { auth } from '../firebase/auth';
   import { onAuthStateChanged } from 'firebase/auth';
-  import { db } from '../firebase/client';
-  import { collection, query, where, getDocs } from 'firebase/firestore';
   // Importamos nuestra nueva función para crear
-  import { createWorkspace } from '../firebase/api';
+  import { createWorkspace, fetchWorkspaces } from '../firebase/api';
   import type { Workspace } from '../types/domain';
 
   // --- OBTENEMOS TODOS LOS ELEMENTOS DEL HTML ---
@@ -44,13 +42,11 @@ import WorkspaceCard from '../components/workspace/WorkspaceCard.astro';
   // --- FUNCIÓN REUTILIZABLE PARA MOSTRAR WORKSPACES ---
   async function fetchAndRenderWorkspaces(userId: string) {
     if (!workspacesGrid) return; // Salimos si el grid no existe
-
-    const q = query(collection(db, "workspaces"), where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
+    const workspaces = await fetchWorkspaces(userId);
 
     workspacesGrid.innerHTML = ''; // Limpiamos el contenido actual
 
-    if (querySnapshot.empty) {
+    if (workspaces.length === 0) {
       workspacesGrid.innerHTML = '<p>Aún no tienes espacios de trabajo. ¡Crea uno!</p>';
       return;
     }
@@ -58,15 +54,11 @@ import WorkspaceCard from '../components/workspace/WorkspaceCard.astro';
     // Renderizamos tarjetas usando el mismo marcado que WorkspaceCard para mantener consistencia visual
     // Nota: No renderizamos el componente directamente aquí porque estamos en script del cliente.
     // Generamos el mismo HTML que produce WorkspaceCard.
-    const fragments: string[] = [];
-    querySnapshot.forEach((doc) => {
-      const workspace = { id: doc.id, ...doc.data() } as Workspace;
-      fragments.push(`
+    const fragments: string[] = workspaces.map((workspace: Workspace) => `
         <a href="/workspace/${workspace.id}/boards" class="block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all">
           <h2 class="text-xl font-semibold">${workspace.name}</h2>
         </a>
       `);
-    });
     workspacesGrid.innerHTML = fragments.join('');
   }
 

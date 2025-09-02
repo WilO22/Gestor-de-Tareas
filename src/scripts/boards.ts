@@ -4,8 +4,8 @@
 import { auth } from '../firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db } from '../firebase/client';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { createBoard } from '../firebase/api';
+import { doc, getDoc } from 'firebase/firestore';
+import { createBoard, fetchBoards } from '../firebase/api';
 import type { Board } from '../types/domain';
 
 // --- Funciones de Ayuda (Helpers) ---
@@ -30,16 +30,14 @@ async function fetchAndRenderBoards(workspaceId: string) {
   const boardsGridEl = document.getElementById('boards-grid');
   if (!boardsGridEl) return;
 
-  const q = query(collection(db, "boards"), where("workspaceId", "==", workspaceId));
-  const querySnapshot = await getDocs(q);
+  const boards = await fetchBoards(workspaceId);
   
   boardsGridEl.innerHTML = ''; // Limpiamos el contenido anterior
-  
-  if(querySnapshot.empty){
+
+  if(boards.length === 0){
     boardsGridEl.innerHTML = `<p>No hay tableros en este espacio de trabajo.</p>`;
   } else {
-    querySnapshot.forEach((doc) => {
-      const board = { id: doc.id, ...doc.data() } as Board; // Aquí el tipado funciona perfecto
+    boards.forEach((board: Board) => {
       const cardHTML = `
         <a href="/workspace/${workspaceId}/board/${board.id}" class="block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all">
           <h2 class="text-xl font-semibold">${board.name}</h2>

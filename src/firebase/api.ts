@@ -2,7 +2,7 @@
 
 import { db } from './client';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import type { Column, Task } from '../types/domain';
+import type { Column, Task, Board, Workspace } from '../types/domain';
 
 // Función para crear un nuevo espacio de trabajo
 export async function createWorkspace(name: string, userId: string) {
@@ -36,6 +36,21 @@ export async function createBoard(name: string, workspaceId: string) {
     console.error("Error al crear el tablero: ", error);
     return { success: false, error: error };
   }
+}
+
+// Obtiene los workspaces de un usuario
+export async function fetchWorkspaces(userId: string): Promise<Workspace[]> {
+  const q = query(collection(db, 'workspaces'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as Partial<Workspace>;
+    return {
+      id: d.id,
+      name: data.name ?? 'Sin nombre',
+      userId: data.userId ?? userId,
+      boards: data.boards ?? []
+    } as Workspace;
+  });
 }
 
 // --- COLUMNAS ---
@@ -110,4 +125,18 @@ export async function fetchTasks(boardId: string): Promise<Task[]> {
     } as Task;
   });
   return tasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+// Obtiene los tableros de un workspace
+export async function fetchBoards(workspaceId: string): Promise<Board[]> {
+  const q = query(collection(db, 'boards'), where('workspaceId', '==', workspaceId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as Partial<Board> & { workspaceId?: string };
+    return {
+      id: d.id,
+      name: (data as any).name ?? 'Sin nombre',
+      columns: (data as any).columns ?? []
+    } as Board;
+  });
 }
