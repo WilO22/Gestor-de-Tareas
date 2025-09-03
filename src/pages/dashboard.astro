@@ -1,89 +1,305 @@
 ---
 //src/pages/dashboard.astro
-import Layout from '../layouts/Layout.astro';
-import WorkspaceCard from '../components/workspace/WorkspaceCard.astro';
+import Layout from "../layouts/Layout.astro";
+import DashboardHeader from "../components/dashboard/DashBoardHeader.astro";
+import Sidebar from "../components/dashboard/Sidebar.astro";
 ---
-<Layout title="Dashboard de Proyectos">
-  <main class="p-8">
-    <h1 class="text-3xl font-bold mb-6">
-      Mis Espacios de Trabajo
-    </h1>
+<Layout title="Dashboard">
 
-    <form id="create-workspace-form" class="mb-6 flex gap-2">
-      <input 
-        type="text" 
-        id="workspace-name" 
-        placeholder="Nombre del nuevo espacio de trabajo" 
-        class="flex-grow px-3 py-2 border rounded-lg" 
-        required
-      />
-      <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-        Crear
-      </button>
-    </form>
-
-    <div id="workspaces-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <p id="loading-message">Cargando espacios de trabajo...</p>
+  <div id="loading-screen" class="h-screen flex items-center justify-center bg-gray-50">
+    <div class="text-center">
+      <div class="text-lg text-gray-600 mb-4">Cargando dashboard...</div>
+      <div class="text-sm text-gray-500">Verificando autenticación...</div>
     </div>
-  </main>
+  </div>
 
-  <script>
-  import { auth } from '../firebase/auth';
-  import { onAuthStateChanged } from 'firebase/auth';
-  // Importamos nuestra nueva función para crear
-  import { createWorkspace, fetchWorkspaces } from '../firebase/api';
-  import type { Workspace } from '../types/domain';
+  <div id="app-container" class="hidden h-screen">
+    <DashboardHeader />
 
-  // --- OBTENEMOS TODOS LOS ELEMENTOS DEL HTML ---
+    <div class="flex h-screen">
+      <Sidebar />
+
+      <main class="flex-1 p-8 bg-gray-50">
+        <div class="max-w-4xl">
+          <!-- Vista por defecto: Lista de espacios de trabajo -->
+          <div id="workspaces-view">
+            <h1 class="text-2xl font-semibold text-gray-800 mb-8">
+              TUS ESPACIOS DE TRABAJO
+            </h1>
+            
+            <div id="workspaces-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div id="loading-message" class="col-span-full text-center text-gray-500">
+                Cargando espacios de trabajo...
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista de tableros de un workspace específico -->
+          <div id="boards-view" class="hidden">            
+            <h1 id="workspace-title" class="text-2xl font-semibold text-gray-800 mb-2">
+              Cargando...
+            </h1>
+            <div class="flex items-center space-x-4 mb-8">
+              <div id="workspace-avatar" class="w-12 h-12 bg-pink-500 rounded flex items-center justify-center text-white font-bold text-xl">
+                D
+              </div>
+              <div>
+                <h2 id="workspace-name" class="text-xl font-semibold text-gray-800">Cargando workspace...</h2>
+              </div>
+              <div class="flex items-center space-x-4 ml-auto">
+                <button class="flex items-center space-x-2 text-gray-700 hover:bg-blue-400 hover:text-white px-3 py-2 rounded transition-colors">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                  </svg>
+                  <span>Tableros</span>
+                </button>
+                <button class="flex items-center space-x-2 text-gray-700 hover:bg-blue-400 hover:text-white px-3 py-2 rounded transition-colors">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                  </svg>
+                  <span>Miembros</span>
+                </button>
+                <button class="flex items-center space-x-2 text-gray-700 hover:bg-blue-400 hover:text-white px-3 py-2 rounded transition-colors">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.55 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                  <span>Configuración</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Sección Tableros -->
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">Tableros</h3>
+            </div>
+
+            <!-- Grid de tableros -->
+            <div id="boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div id="boards-loading" class="col-span-full text-center text-gray-500">
+                Cargando tableros...
+              </div>
+            </div>
+          </div>
+        </div>
+      </main> 
+
+    </div>
+  </div>
+
+<script>
+  import { onAuthStateChanged } from "firebase/auth";
+  import { auth } from "../firebase/auth";
+  import { createWorkspace, fetchWorkspaces, fetchBoards, createBoard } from '../firebase/api';
+  import { doc, getDoc } from 'firebase/firestore';
+  import { db } from '../firebase/client';
+  import type { Workspace, Board } from '../types/domain';
+
+  const appContainer = document.getElementById("app-container");
+  const loadingScreen = document.getElementById("loading-screen");
+  const workspacesView = document.getElementById('workspaces-view');
+  const boardsView = document.getElementById('boards-view');
   const workspacesGrid = document.getElementById('workspaces-grid');
-  const createForm = document.getElementById('create-workspace-form');
-  const workspaceNameInput = document.getElementById('workspace-name') as HTMLInputElement;
+  const boardsGrid = document.getElementById('boards-grid');
+  const loadingMessage = document.getElementById('loading-message');
+  const boardsLoading = document.getElementById('boards-loading');
+  const workspaceTitle = document.getElementById('workspace-title');
+  const workspaceName = document.getElementById('workspace-name');
+  const workspaceAvatar = document.getElementById('workspace-avatar');
 
-  // --- FUNCIÓN REUTILIZABLE PARA MOSTRAR WORKSPACES ---
-  async function fetchAndRenderWorkspaces(userId: string) {
-    if (!workspacesGrid) return; // Salimos si el grid no existe
-    const workspaces = await fetchWorkspaces(userId);
+  let currentWorkspaceId: string | null = null;
 
-    workspacesGrid.innerHTML = ''; // Limpiamos el contenido actual
-
-    if (workspaces.length === 0) {
-      workspacesGrid.innerHTML = '<p>Aún no tienes espacios de trabajo. ¡Crea uno!</p>';
-      return;
+  // Función para mostrar vista de workspaces
+  function showWorkspacesView() {
+    if (workspacesView && boardsView) {
+      workspacesView.classList.remove('hidden');
+      boardsView.classList.add('hidden');
     }
-
-    // Renderizamos tarjetas usando el mismo marcado que WorkspaceCard para mantener consistencia visual
-    // Nota: No renderizamos el componente directamente aquí porque estamos en script del cliente.
-    // Generamos el mismo HTML que produce WorkspaceCard.
-    const fragments: string[] = workspaces.map((workspace: Workspace) => `
-        <a href="/workspace/${workspace.id}/boards" class="block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all">
-          <h2 class="text-xl font-semibold">${workspace.name}</h2>
-        </a>
-      `);
-    workspacesGrid.innerHTML = fragments.join('');
+    currentWorkspaceId = null;
   }
 
-  // --- LÓGICA PRINCIPAL ---
-  onAuthStateChanged(auth, async (user) => {//Escucha en tiempo real si el usuario inicia sesión, cierra sesión o la página se carga.
-    if (user) {
-      // 1. Cuando el usuario carga la página, mostramos sus workspaces
-      fetchAndRenderWorkspaces(user.uid);
+  // Función para mostrar vista de tableros
+  function showBoardsView(workspaceId: string) {
+    if (workspacesView && boardsView) {
+      workspacesView.classList.add('hidden');
+      boardsView.classList.remove('hidden');
+    }
+    currentWorkspaceId = workspaceId;
+    loadWorkspaceDetails(workspaceId);
+    loadWorkspaceBoards(workspaceId);
+  }
 
-      // 2. Preparamos el formulario de creación
-      createForm?.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const workspaceName = workspaceNameInput.value;
+  // Función para cargar detalles del workspace
+  async function loadWorkspaceDetails(workspaceId: string) {
+    try {
+      const docRef = doc(db, "workspaces", workspaceId);
+      const docSnap = await getDoc(docRef);
 
-        if (workspaceName) {
-          // Llamamos a la función para crear en Firestore
-          await createWorkspace(workspaceName, user.uid);
-          // Limpiamos el campo de texto
-          workspaceNameInput.value = '';
-          // Volvemos a cargar y mostrar la lista para que aparezca el nuevo
-          fetchAndRenderWorkspaces(user.uid);
+      if (docSnap.exists()) {
+        const workspace = docSnap.data();
+        if (workspaceTitle) workspaceTitle.textContent = workspace.name;
+        if (workspaceName) workspaceName.textContent = workspace.name;
+        if (workspaceAvatar) {
+          workspaceAvatar.textContent = workspace.name.charAt(0).toUpperCase();
         }
+      }
+    } catch (error) {
+      console.error('Error al cargar detalles del workspace:', error);
+    }
+  }
+
+  // Función para cargar tableros del workspace
+  async function loadWorkspaceBoards(workspaceId: string) {
+    if (!boardsGrid || !boardsLoading) return;
+
+    try {
+      boardsLoading.textContent = 'Cargando tableros...';
+      const boards = await fetchBoards(workspaceId);
+      
+      boardsGrid.innerHTML = '';
+
+      // Agregar siempre el botón de crear tablero al inicio
+      const createBoardCard = document.createElement('div');
+      createBoardCard.className = 'flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-gray-50 transition-all cursor-pointer min-h-[150px]';
+      createBoardCard.innerHTML = `
+        <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        <span class="text-gray-500 text-sm">Crear un tablero nuevo</span>
+      `;
+      
+      // Al hacer click, mostrar modal para crear tablero
+      createBoardCard.addEventListener('click', () => {
+        createNewBoardModal(workspaceId);
       });
+      
+      boardsGrid.appendChild(createBoardCard);
+
+      // Agregar los tableros existentes
+      boards.forEach((board: Board) => {
+        const boardCard = document.createElement('a');
+        boardCard.href = `/workspace/${workspaceId}/board/${board.id}`;
+        boardCard.className = 'block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all bg-white min-h-[150px]';
+        boardCard.innerHTML = `
+          <h3 class="text-lg font-semibold text-gray-800">${board.name}</h3>
+          <p class="text-sm text-gray-600 mt-1">Tablero</p>
+        `;
+        boardsGrid.appendChild(boardCard);
+      });
+
+    } catch (error) {
+      console.error('Error al cargar tableros:', error);
+      if (boardsLoading) {
+        boardsLoading.textContent = 'Error al cargar tableros';
+      }
+    }
+  }
+
+  // Función para crear modal de nuevo tablero
+  function createNewBoardModal(workspaceId: string) {
+    const boardName = prompt('Nombre del nuevo tablero:');
+    
+    if (boardName && boardName.trim()) {
+      createBoardInWorkspace(boardName.trim(), workspaceId);
+    }
+  }
+
+  // Función para crear tablero
+  async function createBoardInWorkspace(boardName: string, workspaceId: string) {
+    try {
+      await createBoard(boardName, workspaceId);
+      loadWorkspaceBoards(workspaceId);
+    } catch (error) {
+      console.error('Error al crear tablero:', error);
+      alert('Error al crear el tablero. Inténtalo de nuevo.');
+    }
+  }
+
+  // Función para renderizar workspaces en la vista principal
+  async function fetchAndRenderWorkspaces(userId: string) {
+    if (!workspacesGrid || !loadingMessage) return;
+
+    try {
+      const workspaces = await fetchWorkspaces(userId);
+      
+      workspacesGrid.innerHTML = '';
+
+      if (workspaces.length === 0) {
+        workspacesGrid.innerHTML = '<div class="col-span-full text-center text-gray-500">Aún no tienes espacios de trabajo. ¡Crea uno desde el menú del usuario!</div>';
+        return;
+      }
+
+      // Renderizar workspaces
+      workspaces.forEach((workspace: Workspace) => {
+        const workspaceCard = document.createElement('div');
+        workspaceCard.className = 'block p-4 border rounded-lg shadow-md hover:bg-gray-100 hover:shadow-lg transition-all bg-white cursor-pointer';
+        workspaceCard.innerHTML = `
+          <div class="flex items-center space-x-3 mb-2">
+            <div class="w-8 h-8 bg-pink-500 rounded flex items-center justify-center text-white font-bold text-sm">
+              ${workspace.name.charAt(0).toUpperCase()}
+            </div>
+            <h2 class="text-lg font-semibold">${workspace.name}</h2>
+          </div>
+          <p class="text-sm text-gray-600">Espacio de trabajo</p>
+        `;
+        
+        // Al hacer click, mostrar los tableros de este workspace
+        workspaceCard.addEventListener('click', () => {
+          showBoardsView(workspace.id);
+        });
+        
+        workspacesGrid.appendChild(workspaceCard);
+      });
+
+    } catch (error) {
+      console.error('Error al cargar workspaces:', error);
+      if (loadingMessage) {
+        loadingMessage.textContent = 'Error al cargar espacios de trabajo';
+      }
+    }
+  }
+
+  // Escuchar evento del sidebar para mostrar tableros
+  window.addEventListener('showWorkspaceBoards', (event: any) => {
+    const { workspaceId } = event.detail;
+    showBoardsView(workspaceId);
+  });
+
+  // Escuchar evento de eliminación de workspace
+  window.addEventListener('workspaceDeleted', (event: any) => {
+    const { workspaceId } = event.detail;
+    
+    // Si estamos viendo los tableros del workspace eliminado, volver a la vista principal
+    if (currentWorkspaceId === workspaceId) {
+      showWorkspacesView();
+    }
+    
+    // Recargar la lista de workspaces
+    const user = auth.currentUser;
+    if (user) {
+      fetchAndRenderWorkspaces(user.uid);
+    }
+  });
+
+  // Autenticación
+  onAuthStateChanged(auth, async (user) => {
+    console.log('Auth state changed:', user ? 'User logged in' : 'User not logged in');
+    
+    if (user) {
+      console.log('User UID:', user.uid);
+      // El usuario está autenticado. Mostramos el dashboard.
+      if (loadingScreen) {
+        loadingScreen.classList.add("hidden");
+      }
+      if (appContainer) {
+        appContainer.classList.remove("hidden");
+      }
+      // Cargar workspaces en la vista principal
+      await fetchAndRenderWorkspaces(user.uid);
     } else {
-      window.location.href = '/login';
+      // El usuario no está autenticado. Lo redirigimos a la página de login.
+      console.log('Redirecting to login...');
+      window.location.href = "/login";
     }
   });
 </script>

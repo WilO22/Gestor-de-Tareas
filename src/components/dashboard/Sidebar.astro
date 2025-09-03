@@ -1,0 +1,255 @@
+---
+// src/components/dashboard/Sidebar.astro
+---
+
+<aside class="w-64 bg-gray-100 border-r border-gray-300 flex flex-col">
+  <div class="px-4 py-4">
+    <h3 class="text-xs font-semibold text-gray-500 uppercase mb-3">
+      Espacios de trabajo
+    </h3>
+    <div id="workspaces-list" class="space-y-2">
+      <!-- Los workspaces se cargarán dinámicamente aquí -->
+    </div>
+  </div>
+</aside>
+
+<script>
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { auth } from '../../firebase/auth';
+  import { fetchWorkspaces } from '../../firebase/api';
+  import type { Workspace } from '../../types/domain';
+
+  const workspacesList = document.getElementById('workspaces-list');
+
+  // Estado para controlar qué workspace está expandido
+  let expandedWorkspaceId: string | null = null;
+
+  // Función para renderizar workspaces
+  async function renderWorkspaces(userId: string) {
+    if (!workspacesList) return;
+
+    try {
+      const workspaces = await fetchWorkspaces(userId);
+      workspacesList.innerHTML = '';
+
+      if (workspaces.length === 0) {
+        workspacesList.innerHTML = '<p class="text-sm text-gray-500">No hay espacios de trabajo</p>';
+        return;
+      }
+
+      workspaces.forEach((workspace: Workspace) => {
+        const workspaceElement = document.createElement('div');
+        workspaceElement.className = 'workspace-item';
+        
+        const isExpanded = expandedWorkspaceId === workspace.id;
+        
+        workspaceElement.innerHTML = `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between cursor-pointer hover:bg-gray-200 rounded p-1" data-workspace-id="${workspace.id}">
+              <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 bg-pink-500 rounded flex items-center justify-center text-xs font-bold text-white">
+                  ${workspace.name.charAt(0).toUpperCase()}
+                </div>
+                <span class="text-gray-800 text-sm font-medium">${workspace.name}</span>
+              </div>
+              <button class="text-gray-400 hover:text-gray-600 toggle-btn" data-workspace-id="${workspace.id}">
+                <svg class="w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="workspace-menu ml-2 space-y-1 ${isExpanded ? '' : 'hidden'}" id="menu-${workspace.id}">
+              <button class="flex items-center space-x-2 text-gray-700 hover:bg-blue-500 hover:text-white px-2 py-1 rounded text-sm transition-colors w-full boards-btn" data-workspace-id="${workspace.id}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <span>Tableros</span>
+              </button>
+              <button class="flex items-center justify-between text-gray-700 hover:bg-blue-500 hover:text-white px-2 py-1 rounded text-sm transition-colors w-full" data-workspace-id="${workspace.id}">
+                <div class="flex items-center space-x-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                  </svg>
+                  <span>Miembros</span>
+                </div>
+                <svg class="w-3 h-3 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+              </button>
+              
+              <!-- Configuración con funcionalidad de eliminar -->
+              <div class="relative">
+                <button class="flex items-center space-x-2 text-gray-700 hover:bg-blue-500 hover:text-white px-2 py-1 rounded text-sm transition-colors w-full config-btn" data-workspace-id="${workspace.id}">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                  <span>Configuración</span>
+                  <svg class="w-3 h-3 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                
+                <!-- Submenu de configuración -->
+                <div class="config-submenu hidden ml-4 mt-1 space-y-1" id="config-menu-${workspace.id}">
+                  <button class="flex items-center space-x-2 text-gray-600 hover:bg-red-500 hover:text-white px-2 py-1 rounded text-sm transition-colors w-full delete-workspace-btn" data-workspace-id="${workspace.id}" data-workspace-name="${workspace.name}">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    <span>Eliminar espacio</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        workspacesList.appendChild(workspaceElement);
+      });
+
+      // Agregar event listeners
+      addEventListeners();
+
+    } catch (error) {
+      console.error('Error al cargar workspaces en sidebar:', error);
+    }
+  }
+
+  function addEventListeners() {
+    // Toggle para expandir/contraer workspaces
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const workspaceId = (e.currentTarget as HTMLElement).dataset.workspaceId;
+        toggleWorkspace(workspaceId);
+      });
+    });
+
+    // Click en workspace para expandir
+    document.querySelectorAll('[data-workspace-id]').forEach(element => {
+      if (!element.classList.contains('toggle-btn') && 
+          !element.classList.contains('boards-btn') && 
+          !element.classList.contains('config-btn') &&
+          !element.classList.contains('delete-workspace-btn')) {
+        element.addEventListener('click', () => {
+          const workspaceId = (element as HTMLElement).dataset.workspaceId;
+          toggleWorkspace(workspaceId);
+        });
+      }
+    });
+
+    // Click en "Tableros" para ir a la página de tableros
+    document.querySelectorAll('.boards-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const workspaceId = (e.currentTarget as HTMLElement).dataset.workspaceId;
+        if (workspaceId) {
+          // Comunicar al dashboard que muestre los tableros de este workspace
+          window.dispatchEvent(new CustomEvent('showWorkspaceBoards', { detail: { workspaceId } }));
+        }
+      });
+    });
+
+    // Click en "Configuración" para mostrar/ocultar submenu
+    document.querySelectorAll('.config-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const workspaceId = (e.currentTarget as HTMLElement).dataset.workspaceId;
+        if (workspaceId) {
+          toggleConfigMenu(workspaceId);
+        }
+      });
+    });
+
+    // Click en "Eliminar espacio"
+    document.querySelectorAll('.delete-workspace-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const workspaceId = (e.currentTarget as HTMLElement).dataset.workspaceId;
+        const workspaceName = (e.currentTarget as HTMLElement).dataset.workspaceName;
+        if (workspaceId && workspaceName) {
+          showDeleteConfirmation(workspaceId, workspaceName);
+        }
+      });
+    });
+  }
+
+  function toggleWorkspace(workspaceId: string | undefined) {
+    if (!workspaceId) return;
+
+    const menu = document.getElementById(`menu-${workspaceId}`);
+    const toggleIcon = document.querySelector(`[data-workspace-id="${workspaceId}"].toggle-btn svg`);
+    
+    if (menu && toggleIcon) {
+      const isCurrentlyExpanded = !menu.classList.contains('hidden');
+      
+      // Contraer todos los workspaces
+      document.querySelectorAll('.workspace-menu').forEach(m => m.classList.add('hidden'));
+      document.querySelectorAll('.toggle-btn svg').forEach(icon => icon.classList.remove('rotate-180'));
+      // Contraer todos los submenus de configuración
+      document.querySelectorAll('.config-submenu').forEach(m => m.classList.add('hidden'));
+      
+      if (!isCurrentlyExpanded) {
+        // Expandir el workspace seleccionado
+        menu.classList.remove('hidden');
+        toggleIcon.classList.add('rotate-180');
+        expandedWorkspaceId = workspaceId;
+      } else {
+        expandedWorkspaceId = null;
+      }
+    }
+  }
+
+  function toggleConfigMenu(workspaceId: string) {
+    const configMenu = document.getElementById(`config-menu-${workspaceId}`);
+    if (configMenu) {
+      // Cerrar otros menus de configuración
+      document.querySelectorAll('.config-submenu').forEach(menu => {
+        if (menu !== configMenu) {
+          menu.classList.add('hidden');
+        }
+      });
+      
+      // Toggle del menu actual
+      configMenu.classList.toggle('hidden');
+    }
+  }
+
+  function showDeleteConfirmation(workspaceId: string, workspaceName: string) {
+    const confirmed = confirm(`¿Estás seguro de que quieres eliminar el espacio de trabajo "${workspaceName}"?\n\nEsta acción eliminará también todos los tableros asociados y no se puede deshacer.`);
+    
+    if (confirmed) {
+      deleteWorkspaceById(workspaceId);
+    }
+  }
+
+  async function deleteWorkspaceById(workspaceId: string) {
+    try {
+      const { deleteWorkspace } = await import('../../firebase/api');
+      const result = await deleteWorkspace(workspaceId);
+      
+      if (result.success) {
+        // Recargar la lista de workspaces
+        const user = auth.currentUser;
+        if (user) {
+          await renderWorkspaces(user.uid);
+          // Notificar al dashboard para que también se actualice
+          window.dispatchEvent(new CustomEvent('workspaceDeleted', { detail: { workspaceId } }));
+        }
+      } else {
+        alert('Error al eliminar el espacio de trabajo. Inténtalo de nuevo.');
+      }
+    } catch (error) {
+      console.error('Error al eliminar workspace:', error);
+      alert('Error al eliminar el espacio de trabajo. Inténtalo de nuevo.');
+    }
+  }
+
+  // Inicializar cuando el usuario esté autenticado
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      await renderWorkspaces(user.uid);
+    }
+  });
+</script>

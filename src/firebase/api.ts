@@ -1,7 +1,7 @@
 // src/firebase/api.ts
 
 import { db } from './client';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, deleteDoc } from 'firebase/firestore';
 import type { Column, Task, Board, Workspace } from '../types/domain';
 
 // Función para crear un nuevo espacio de trabajo
@@ -87,6 +87,28 @@ export async function fetchWorkspaces(userId: string): Promise<Workspace[]> {
       boards: data.boards ?? []
     } as Workspace;
   });
+}
+
+// Elimina un workspace y todos sus tableros asociados
+export async function deleteWorkspace(workspaceId: string) {
+  try {
+    // Primero eliminar todos los tableros del workspace
+    const boardsQuery = query(collection(db, 'boards'), where('workspaceId', '==', workspaceId));
+    const boardsSnapshot = await getDocs(boardsQuery);
+    
+    // Eliminar todos los tableros
+    const deletePromises = boardsSnapshot.docs.map(boardDoc => deleteDoc(boardDoc.ref));
+    await Promise.all(deletePromises);
+    
+    // Luego eliminar el workspace
+    await deleteDoc(doc(db, 'workspaces', workspaceId));
+    
+    console.log('Workspace eliminado con ID: ', workspaceId);
+    return { success: true };
+  } catch (error) {
+    console.error('Error al eliminar el workspace: ', error);
+    return { success: false, error: error };
+  }
 }
 
 // Obtiene los tableros de un workspace
