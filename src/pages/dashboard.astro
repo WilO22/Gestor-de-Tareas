@@ -63,7 +63,7 @@ import WorkspaceCard from '../components/workspace/WorkspaceCard.astro';
   }
 
   // --- LÓGICA PRINCIPAL ---
-  onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, async (user) => {//Escucha en tiempo real si el usuario inicia sesión, cierra sesión o la página se carga.
     if (user) {
       // 1. Cuando el usuario carga la página, mostramos sus workspaces
       fetchAndRenderWorkspaces(user.uid);

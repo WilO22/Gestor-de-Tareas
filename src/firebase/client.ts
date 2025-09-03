@@ -18,6 +18,6 @@ const firebaseConfig = {
 // 3. Inicializamos la aplicación de Firebase con nuestra configuración
 export const app = initializeApp(firebaseConfig);
 
-// 4. Obtenemos acceso a la base de datos (nuestro "cuaderno mágico")
+// 4. Obtenemos acceso a la base de datos 
 //    y la exportamos para que otros archivos puedan usarla.
 export const db = getFirestore(app);

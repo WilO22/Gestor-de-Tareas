@@ -38,21 +38,6 @@ export async function createBoard(name: string, workspaceId: string) {
   }
 }
 
-// Obtiene los workspaces de un usuario
-export async function fetchWorkspaces(userId: string): Promise<Workspace[]> {
-  const q = query(collection(db, 'workspaces'), where('userId', '==', userId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data() as Partial<Workspace>;
-    return {
-      id: d.id,
-      name: data.name ?? 'Sin nombre',
-      userId: data.userId ?? userId,
-      boards: data.boards ?? []
-    } as Workspace;
-  });
-}
-
 // --- COLUMNAS ---
 // Crea una nueva columna para un tablero
 export async function createColumn(name: string, boardId: string, order: number) {
@@ -68,25 +53,6 @@ export async function createColumn(name: string, boardId: string, order: number)
     console.error('Error al crear la columna: ', error);
     return { success: false, error };
   }
-}
-
-// Obtiene columnas de un tablero ordenadas por 'order'
-export async function fetchColumns(boardId: string): Promise<Column[]> {
-  // Importante: evitamos orderBy en la query para no requerir un índice compuesto.
-  // Luego ordenamos en memoria por 'order'.
-  const q = query(collection(db, 'columns'), where('boardId', '==', boardId));
-  const snap = await getDocs(q);
-  const cols = snap.docs.map((d) => {
-    const data = d.data() as Partial<Column>;
-    return {
-      id: d.id,
-      name: data.name ?? 'Sin nombre',
-      boardId: data.boardId ?? boardId,
-      order: data.order ?? 0,
-      tasks: []
-    } as Column;
-  });
-  return cols.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 // --- TAREAS ---
@@ -108,6 +74,55 @@ export async function createTask(title: string, boardId: string, columnId: strin
   }
 }
 
+// Obtiene los workspaces de un usuario
+export async function fetchWorkspaces(userId: string): Promise<Workspace[]> {
+  const q = query(collection(db, 'workspaces'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as Partial<Workspace>;
+    return {
+      id: d.id,
+      name: data.name ?? 'Sin nombre',
+      userId: data.userId ?? userId,
+      boards: data.boards ?? []
+    } as Workspace;
+  });
+}
+
+// Obtiene los tableros de un workspace
+export async function fetchBoards(workspaceId: string): Promise<Board[]> {
+  const q = query(collection(db, 'boards'), where('workspaceId', '==', workspaceId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as Partial<Board> & { workspaceId?: string };
+    return {
+      id: d.id,
+      name: (data as any).name ?? 'Sin nombre',
+      columns: (data as any).columns ?? []
+    } as Board;
+  });
+}
+
+// Obtiene columnas de un tablero ordenadas por 'order'
+export async function fetchColumns(boardId: string): Promise<Column[]> {
+  // Importante: evitamos orderBy en la query para no requerir un índice compuesto.
+  // Luego ordenamos en memoria por 'order'.
+  const q = query(collection(db, 'columns'), where('boardId', '==', boardId));
+  const snap = await getDocs(q);
+  const cols = snap.docs.map((d) => {
+    const data = d.data() as Partial<Column>;
+    return {
+      id: d.id,
+      name: data.name ?? 'Sin nombre',
+      boardId: data.boardId ?? boardId,
+      order: data.order ?? 0,
+      tasks: []
+    } as Column;
+  });
+  return cols.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+
 // Obtiene tareas de un tablero (todas las columnas) ordenadas por 'order'
 export async function fetchTasks(boardId: string): Promise<Task[]> {
   // Igual que columnas: sin orderBy en Firestore, ordenamos en memoria.
@@ -127,16 +142,3 @@ export async function fetchTasks(boardId: string): Promise<Task[]> {
   return tasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
-// Obtiene los tableros de un workspace
-export async function fetchBoards(workspaceId: string): Promise<Board[]> {
-  const q = query(collection(db, 'boards'), where('workspaceId', '==', workspaceId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data() as Partial<Board> & { workspaceId?: string };
-    return {
-      id: d.id,
-      name: (data as any).name ?? 'Sin nombre',
-      columns: (data as any).columns ?? []
-    } as Board;
-  });
-}
