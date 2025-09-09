@@ -1,0 +1,511 @@
+---
+// src/components/board/BoardHeader.astro
+// Cabecera secundaria del board con opciones como en Trello
+---
+
+<div class="bg-white border-b border-gray-200 px-6 py-3 mb-6">
+  <div class="flex items-center justify-between">
+    <!-- Lado izquierdo: Buscador -->
+    <div class="flex items-center space-x-4">
+      <div class="relative">
+        <input
+          type="text"
+          id="board-search"
+          placeholder="Buscar tarjetas..."
+          class="pl-10 pr-4 py-2 w-80 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        />
+        <svg class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Lado derecho: Acciones del board -->
+    <div class="flex items-center space-x-3">
+      <!-- Botón Compartir -->
+      <button class="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
+        </svg>
+        <span>Compartir</span>
+      </button>
+
+      <!-- Menú de opciones (3 puntos) -->
+      <div class="relative">
+        <button 
+          id="board-menu-trigger"
+          class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+          </svg>
+        </button>
+
+        <!-- Dropdown del menú -->
+        <div 
+          id="board-menu-dropdown" 
+          class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 hidden"
+        >
+          <!-- Vista principal del menú -->
+          <div id="main-menu-view" class="py-2">
+            <button 
+              id="show-archived-tasks-btn"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between"
+            >
+              <div class="flex items-center space-x-3">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8l6 6m0 0l6-6m-6 6v9a2 2 0 01-2 2H7a2 2 0 01-2-2v-9zM3 4h18"></path>
+                </svg>
+                <span>Elementos archivados</span>
+              </div>
+              <!-- Flecha para indicar que abre submenú -->
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
+            
+            <hr class="my-1 border-gray-200">
+            
+            <button class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-3">
+              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span>Configuración del tablero</span>
+            </button>
+          </div>
+
+          <!-- Vista de elementos archivados (oculta por defecto) -->
+          <div id="archived-tasks-view" class="hidden">
+            <!-- Header de la vista de archivados -->
+            <div class="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+              <button id="back-to-main-menu" class="flex items-center space-x-2 text-gray-600 hover:text-gray-800">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                <span class="text-sm font-medium">Elementos archivados</span>
+              </button>
+            </div>
+            
+            <!-- Descripción informativa -->
+            <div class="p-3 bg-blue-50 border-b border-gray-200">
+              <p class="text-xs text-blue-700 flex items-start space-x-2">
+                <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Los elementos archivados pueden ser restaurados al tablero o eliminados permanentemente.</span>
+              </p>
+            </div>
+            
+            <!-- Lista de tareas archivadas -->
+            <div id="archived-tasks-container" class="max-h-80 overflow-y-auto">
+              <div id="archived-tasks-list" class="p-3 space-y-2">
+                <!-- Las tareas archivadas se cargarán aquí dinámicamente -->
+                <div id="loading-archived" class="text-center py-8 text-gray-500 text-sm">
+                  Cargando elementos archivados...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- // Modal dinámico de confirmación de eliminación (fuera del contenedor con scroll) -->
+<div id="delete-task-modal" class="absolute bg-white rounded-lg shadow-lg border border-gray-200 z-[60] hidden w-72">
+  <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200">
+    <h3 class="text-sm font-medium text-gray-800">¿Eliminar la tarjeta?</h3>
+    <button class="close-global-delete-modal text-gray-400 hover:text-gray-600 transition-colors p-1">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="px-3 py-3">
+    <p class="text-gray-600 text-xs mb-3 leading-relaxed">
+      Se quitarán todas las acciones de la fuente de actividades y no podrás volver a abrir la tarjeta. No es posible deshacer esta acción.
+    </p>
+    <div class="flex space-x-2">
+      <button 
+        class="confirm-global-delete flex-1 px-3 py-2 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+      >
+        Eliminar
+      </button>
+      <button 
+        class="cancel-global-delete flex-1 px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 transition-colors"
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Script para manejar el dropdown del menú y navegación entre vistas
+  document.addEventListener('DOMContentLoaded', () => {
+    const menuTrigger = document.getElementById('board-menu-trigger');
+    const menuDropdown = document.getElementById('board-menu-dropdown');
+    const archivedTasksBtn = document.getElementById('show-archived-tasks-btn');
+    
+    // Elementos de navegación entre vistas
+    const mainMenuView = document.getElementById('main-menu-view');
+    const archivedTasksView = document.getElementById('archived-tasks-view');
+    const backToMainBtn = document.getElementById('back-to-main-menu');
+
+    // Toggle del dropdown principal
+    menuTrigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Al abrir, siempre mostrar la vista principal primero
+      showMainMenuView();
+      menuDropdown?.classList.toggle('hidden');
+    });
+
+    // Función para mostrar vista principal del menú
+    function showMainMenuView() {
+      mainMenuView?.classList.remove('hidden');
+      archivedTasksView?.classList.add('hidden');
+    }
+
+    // Función para mostrar vista de elementos archivados
+    function showArchivedTasksView() {
+      mainMenuView?.classList.add('hidden');
+      archivedTasksView?.classList.remove('hidden');
+      
+      // Solo cargar tareas archivadas si la lista está vacía o no se ha cargado
+      const tasksList = document.getElementById('archived-tasks-list');
+      const loadingElement = document.getElementById('loading-archived');
+      const existingTasks = tasksList?.querySelectorAll('.archived-task-item');
+      
+      // // Verificar si el único elemento es el mensaje vacío (no tareas reales)
+      const hasOnlyEmptyMessage = existingTasks?.length === 1 && 
+                                 existingTasks[0].textContent?.includes('No hay elementos archivados');
+      
+      // Cargar solo si:
+      // 1. Está mostrando el loading (primera vez)
+      // 2. No hay tareas en la lista
+      // 3. Solo tiene el mensaje vacío (nueva verificación)
+      const shouldLoad = loadingElement?.style.display !== 'none' || 
+                        !existingTasks || 
+                        existingTasks.length === 0 ||
+                        hasOnlyEmptyMessage;
+
+      // Verbose debug logging can be toggled at runtime via window.__DEBUG__
+      if ((window as any).__DEBUG__) {
+        console.log('🔄 Verificando si debe cargar tareas archivadas:', { 
+          shouldLoad, 
+          loadingVisible: loadingElement?.style.display !== 'none',
+          existingTasksCount: existingTasks?.length || 0,
+          hasOnlyEmptyMessage: hasOnlyEmptyMessage
+        });
+      }
+      
+      if (shouldLoad && typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
+    if ((window as any).__DEBUG__) console.log('📥 Cargando elementos archivados (tareas y columnas)...');
+        (window as any).loadArchivedColumnsInDropdown(true); // // Forzar recarga para obtener datos frescos
+      } else {
+  if ((window as any).__DEBUG__) console.log('✋ No se necesita recargar, usando tareas existentes');
+      }
+    }
+
+    // Cerrar dropdown al hacer click fuera
+    document.addEventListener('click', (e) => {
+      if (!menuTrigger?.contains(e.target as Node) && !menuDropdown?.contains(e.target as Node)) {
+        menuDropdown?.classList.add('hidden');
+        showMainMenuView(); // Resetear a vista principal al cerrar
+      }
+    });
+
+    // Evento para mostrar vista de elementos archivados (ya no llama al modal)
+    archivedTasksBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showArchivedTasksView();
+    });
+
+    // Evento para volver a la vista principal
+    backToMainBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showMainMenuView();
+    });
+
+    // Event listeners para acciones de tareas archivadas (restaurar/eliminar)
+    const archivedTasksContainer = document.getElementById('archived-tasks-container');
+  if ((window as any).__DEBUG__) console.log('🔧 Configurando event listeners para tareas archivadas:', !!archivedTasksContainer);
+    
+    // // Variables para el modal dinámico de eliminación (posicionado fuera del scroll)
+    const deleteModal = document.getElementById('delete-task-modal');
+    let taskToDelete: string | null = null;
+    
+    // Event listener para cerrar modal al hacer click fuera
+    document.addEventListener('click', (e) => {
+      if (deleteModal && !deleteModal.classList.contains('hidden')) {
+        const target = e.target as HTMLElement;
+        // Cerrar si se hace click fuera del modal y no es un botón de eliminar
+        if (!deleteModal.contains(target) && !target.closest('.delete-task')) {
+          deleteModal.classList.add('hidden');
+          taskToDelete = null;
+        }
+      }
+    });
+    
+    // // Event listeners específicos para el modal global (fuera del contenedor de scroll)
+    deleteModal?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      e.stopPropagation(); // Evitar que se cierre el modal
+      
+      console.log('🎯 Click detectado en modal global:', { 
+        target: target.tagName, 
+        classList: target.classList.toString(),
+        taskToDelete: taskToDelete
+      });
+      
+      // // Manejo de botón "Cerrar modal" en modal global
+      if (target.closest('.close-global-delete-modal')) {
+        console.log('❌ Cerrando modal sin eliminar');
+        deleteModal.classList.add('hidden');
+        taskToDelete = null;
+      }
+      
+      // // Manejo de botón "Cancelar" en modal global
+      else if (target.closest('.cancel-global-delete')) {
+        console.log('🚫 Cancelando eliminación');
+        deleteModal.classList.add('hidden');
+        taskToDelete = null;
+      }
+      
+      // // Manejo de botón "Confirmar eliminación" en modal global
+      else if (target.closest('.confirm-global-delete')) {
+        console.log('✅ Confirmar eliminación de tarea:', taskToDelete);
+        
+        if (!taskToDelete) {
+          console.warn('⚠️ No hay tarea para eliminar');
+          return;
+        }
+        
+        try {
+          // // Cerrar el modal antes de la operación
+          deleteModal.classList.add('hidden');
+          
+          // // Llamar función global de eliminar (definida en board-page.ts)
+          if (typeof (window as any).deleteTask === 'function') {
+            console.log('🔄 Llamando función deleteTask para:', taskToDelete);
+            const result = await (window as any).deleteTask(taskToDelete);
+            console.log('📊 Resultado de eliminación:', result);
+            
+            if (result && result.success) {
+              console.log('✅ Tarea eliminada permanentemente:', taskToDelete);
+              
+              // // Buscar y remover la tarjeta del DOM con animación suave
+              const taskCardToRemove = document.querySelector(`[data-task-id="${taskToDelete}"]`) as HTMLElement;
+              if (taskCardToRemove) {
+                taskCardToRemove.style.transform = 'translateX(100%)';
+                taskCardToRemove.style.opacity = '0';
+                taskCardToRemove.style.transition = 'transform 300ms ease-out, opacity 300ms ease-out';
+                
+                setTimeout(() => {
+                  console.log('🗑️ Removiendo tarjeta del DOM tras eliminar:', taskToDelete);
+                  taskCardToRemove.remove();
+                  
+                  // Verificar si no quedan más tareas archivadas
+                  const tasksList = document.getElementById('archived-tasks-list');
+                  const remainingTasks = tasksList?.querySelectorAll('.archived-task-item');
+                  console.log('📊 Tareas restantes después de eliminar:', remainingTasks?.length || 0);
+                  
+                  if (remainingTasks && remainingTasks.length === 0) {
+                    // Para eliminación SÍ verificamos si hay más elementos en Firebase
+                    console.log('🔄 No quedan elementos visibles tras eliminar, verificando en Firebase...');
+                    if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
+                      (window as any).loadArchivedColumnsInDropdown(true); // Forzar recarga para verificar
+                    }
+                  }
+                }, 300);
+              }
+            } else {
+              console.error('❌ La eliminación no fue exitosa:', result);
+            }
+          } else {
+            console.error('❌ Función deleteTask no encontrada en window');
+          }
+          
+          // // Resetear variable
+          taskToDelete = null;
+        } catch (error) {
+          console.error('❌ Error eliminando tarea:', error);
+          taskToDelete = null;
+        }
+      }
+    });
+    
+    // Set para rastrear tareas que están siendo restauradas (evitar conflictos de timing)
+    const tasksBeingRestored = new Set();
+    
+    // // Función para posicionar dinámicamente el modal debajo del botón eliminar
+    // // Actualizada para aceptar modal personalizado y ser más flexible
+    function positionDeleteModal(buttonElement: HTMLElement, customModal?: HTMLElement) {
+      const modalToPosition = customModal || deleteModal;
+      if (!modalToPosition) return;
+      
+      const rect = buttonElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      
+      // // Mantener position como fixed si ya está establecido, sino usar absolute
+      if (!modalToPosition.style.position) {
+        modalToPosition.style.position = 'absolute';
+      }
+      modalToPosition.style.top = `${rect.bottom + scrollTop + 2}px`; // 2px de margen
+      modalToPosition.style.left = `${rect.left + scrollLeft}px`;
+      
+      // // Verificar si el modal se sale por la derecha de la pantalla
+      const modalWidth = 288; // w-72 = 288px
+      if (rect.left + modalWidth > window.innerWidth) {
+        // Alinear a la derecha del botón
+        modalToPosition.style.left = `${rect.right + scrollLeft - modalWidth}px`;
+      }
+      
+      console.log('📍 Modal posicionado en:', { 
+        top: modalToPosition.style.top, 
+        left: modalToPosition.style.left,
+        buttonRect: rect 
+      });
+    }
+    
+    // // Event delegation para manejar todos los clicks en el contenedor de elementos archivados (tareas Y columnas)
+    archivedTasksContainer?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      
+      // // EXTENDIDO: Buscar tanto tareas como columnas
+      const taskCard = target.closest('[data-task-id]') as HTMLElement;
+      const columnCard = target.closest('[data-column-id]') as HTMLElement;
+      const taskId = taskCard?.getAttribute('data-task-id');
+      const columnId = columnCard?.getAttribute('data-column-id');
+      
+      if ((window as any).__DEBUG__) {
+        console.log('🎯 Click detectado en container archivados:', { 
+          target: target.tagName, 
+          taskId, 
+          columnId, // // AGREGADO: log del columnId
+          classList: target.classList.toString(),
+          closestRestore: !!target.closest('.restore-task'),
+          closestDelete: !!target.closest('.delete-task'),
+          closestRestoreColumn: !!target.closest('.restore-column'), // // AGREGADO: restore column
+          closestDeleteColumn: !!target.closest('.delete-column'), // // AGREGADO: delete column
+          closestConfirm: !!target.closest('.confirm-delete'),
+          closestCancel: !!target.closest('.cancel-delete'),
+          closestClose: !!target.closest('.close-delete-modal')
+        });
+      }
+      
+      // // CAMBIADO: Manejar tanto tareas como columnas
+      if (!taskId && !columnId) return;
+      
+      // // === MANEJO DE COLUMNAS ARCHIVADAS ===
+      if (columnId) {
+        console.log('🗂️ Procesando acción en columna archivada:', columnId);
+        
+        // // Manejo de botón "Restaurar Columna"
+        if (target.closest('.restore-column')) {
+          e.stopPropagation();
+          console.log('🔄 Intentando restaurar columna:', columnId);
+          
+          try {
+            // // Llamar función global de restaurar columna (definida en board-page.ts)
+            if (typeof (window as any).optimizedRestoreColumn === 'function') {
+              const result = await (window as any).optimizedRestoreColumn(columnId);
+              console.log('✅ Resultado de restauración de columna:', result);
+            }
+          } catch (error) {
+            console.error('❌ Error restaurando columna:', error);
+          }
+          return; // // Importante: return para no procesar como tarea
+        }
+        
+        // // Manejo de botón "Eliminar Columna" - mostrar modal dinámico
+        if (target.closest('.delete-column')) {
+          e.stopPropagation();
+          console.log('🗑️ Mostrar modal de eliminación para columna:', columnId);
+          
+          const _deleteButton = target.closest('.delete-column') as HTMLElement;
+          void _deleteButton;
+          const columnName = columnCard.querySelector('span')?.textContent || 'Sin nombre';
+          
+          // // Llamar función global para mostrar modal de eliminación de columna
+          if (typeof (window as any).showColumnDeleteModal === 'function') {
+            (window as any).showColumnDeleteModal(columnId, columnName);
+          }
+          return; // // Importante: return para no procesar como tarea
+        }
+      }
+      
+      // // === MANEJO DE TAREAS ARCHIVADAS (código existente) ===
+      if (!taskId) return; // // Solo procesar tareas si hay taskId
+      
+      // // Manejo de botón "Restaurar"
+      if (target.closest('.restore-task')) {
+        e.stopPropagation();
+        
+        // Evitar doble restauración
+        if (tasksBeingRestored.has(taskId)) {
+          console.log('⏳ Tarea ya está siendo restaurada, ignorando click:', taskId);
+          return;
+        }
+        
+        console.log('🔄 Intentando restaurar tarea:', taskId);
+        tasksBeingRestored.add(taskId); // Marcar como siendo restaurada
+        
+        // Deshabilitar botones para evitar clicks adicionales
+        const restoreBtn = taskCard.querySelector('.restore-task') as HTMLElement;
+        const deleteBtn = taskCard.querySelector('.delete-task') as HTMLElement;
+        if (restoreBtn) restoreBtn.style.pointerEvents = 'none';
+        if (deleteBtn) deleteBtn.style.pointerEvents = 'none';
+        
+        try {
+          // // Llamar función global de restaurar (definida en board-page.ts)
+          if (typeof (window as any).optimizedRestoreTask === 'function') {
+            const result = await (window as any).optimizedRestoreTask(taskId);
+            console.log('✅ Resultado de restauración:', result);
+          }
+        } catch (error) {
+          console.error('❌ Error restaurando tarea:', error);
+        } finally {
+          // // Limpiar estado de restauración independientemente del resultado
+          tasksBeingRestored.delete(taskId);
+          if (restoreBtn) restoreBtn.style.pointerEvents = 'auto';
+          if (deleteBtn) deleteBtn.style.pointerEvents = 'auto';
+        }
+      } 
+      
+      // // Manejo de botón "Eliminar" - mostrar modal dinámico posicionado debajo del botón
+      else if (target.closest('.delete-task')) {
+        e.stopPropagation();
+        console.log('🗑️ Mostrar modal de eliminación para tarea:', taskId);
+        
+        const deleteButton = target.closest('.delete-task') as HTMLElement;
+        taskToDelete = taskId;
+        
+        // // Posicionar y mostrar el modal dinámico
+        if (deleteModal && deleteButton) {
+          positionDeleteModal(deleteButton);
+          deleteModal.classList.remove('hidden');
+        }
+      }
+    });
+    
+    // // Cerrar modales al hacer click fuera
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      // Si el click no es dentro de un modal o sus controles, cerrar todos los modales
+      if (!target.closest('[class*="delete-modal-"]') && !target.closest('.delete-task')) {
+        document.querySelectorAll('[class*="delete-modal-"]').forEach(modal => {
+          (modal as HTMLElement).classList.add('hidden');
+        });
+      }
+    });
+
+    // Exponer funciones globalmente para uso desde board-page.ts
+    (window as any).showMainMenuView = showMainMenuView;
+    (window as any).showArchivedTasksView = showArchivedTasksView;
+    (window as any).positionDeleteModal = positionDeleteModal;
+  });
+</script>

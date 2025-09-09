@@ -1,0 +1,66 @@
+---
+// Layout principal del dashboard que contiene la estructura base
+import Layout from "../../layouts/Layout.astro";
+import DashboardHeader from "./DashBoardHeader.astro";
+import Sidebar from "./Sidebar.astro";
+
+interface Props {
+  title?: string;
+}
+
+const { title = "Dashboard" } = Astro.props;
+---
+
+<Layout title={title}>
+  <!-- Pantalla de carga inicial -->
+  <div id="loading-screen" class="h-screen flex items-center justify-center bg-gray-50">
+    <div class="text-center">
+      <div class="text-lg text-gray-600 mb-4">Cargando dashboard...</div>
+      <div class="text-sm text-gray-500">Verificando autenticación...</div>
+    </div>
+  </div>
+
+  <!-- Contenedor principal de la aplicación -->
+  <div id="app-container" class="hidden h-screen">
+    <DashboardHeader />
+
+    <div class="flex h-screen">
+      <Sidebar />
+
+      <main class="flex-1 p-8 bg-gray-50">
+        <div class="max-w-4xl">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Estilos globales del dashboard -->
+  <style>
+    /* Estilos para pestañas activas */
+    .tab-btn.active {
+      background-color: #3B82F6 !important;
+      color: white !important;
+    }
+
+    .tab-btn:not(.active):hover {
+      background-color: #60A5FA;
+      color: white;
+    }
+
+    /* Animaciones suaves para el contenido de pestañas */
+    .tab-content {
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    /* Estilo para botones de acción */
+    .action-btn {
+      transition: all 0.2s ease-in-out;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+  </style>
+</Layout>

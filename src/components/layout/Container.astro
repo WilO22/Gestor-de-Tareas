@@ -1,0 +1,190 @@
+---
+// src/components/layout/Container.astro
+// Contenedor responsive reutilizable
+
+export interface Props {
+  // Tamaño
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
+  
+  // Responsive
+  responsive?: boolean;
+  maxWidth?: string;
+  
+  // Espaciado
+  padding?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  paddingX?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  paddingY?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  
+  // Alineación
+  align?: 'left' | 'center' | 'right';
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  
+  // Tema y colores
+  theme?: 'light' | 'dark' | 'auto';
+  background?: 'transparent' | 'white' | 'gray' | 'blue' | 'green' | 'red';
+  
+  // Bordes y sombras
+  border?: boolean;
+  shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  
+  // Estados
+  loading?: boolean;
+  
+  // Clases adicionales
+  class?: string;
+}
+
+const {
+  size = 'lg',
+  responsive = true,
+  maxWidth,
+  padding = 'md',
+  paddingX,
+  paddingY,
+  align = 'left',
+  textAlign = 'left',
+  theme = 'auto',
+  background = 'transparent',
+  border = false,
+  shadow = 'none',
+  rounded = 'none',
+  loading = false,
+  class: additionalClasses = ''
+} = Astro.props;
+
+// Clases base
+const baseClasses = [
+  'w-full mx-auto',
+  'relative'
+];
+
+// Tamaños
+const sizeClasses = {
+  xs: 'max-w-xs',
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  '4xl': 'max-w-4xl',
+  '5xl': 'max-w-5xl',
+  full: 'max-w-full'
+};
+
+// Espaciado
+const paddingClasses = {
+  none: 'p-0',
+  xs: 'p-2',
+  sm: 'p-4',
+  md: 'p-6',
+  lg: 'p-8',
+  xl: 'p-12'
+};
+
+const paddingXClasses = paddingX ? {
+  none: 'px-0',
+  xs: 'px-2',
+  sm: 'px-4',
+  md: 'px-6',
+  lg: 'px-8',
+  xl: 'px-12'
+}[paddingX] : '';
+
+const paddingYClasses = paddingY ? {
+  none: 'py-0',
+  xs: 'py-2',
+  sm: 'py-4',
+  md: 'py-6',
+  lg: 'py-8',
+  xl: 'py-12'
+}[paddingY] : '';
+
+// Alineación
+const alignClasses = {
+  left: 'mr-auto',
+  center: 'mx-auto',
+  right: 'ml-auto'
+};
+
+const textAlignClasses = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+  justify: 'text-justify'
+};
+
+// Tema
+const themeClasses = {
+  light: '',
+  dark: 'dark',
+  auto: ''
+};
+
+// Fondos
+const backgroundClasses = {
+  transparent: '',
+  white: 'bg-white',
+  gray: 'bg-gray-50',
+  blue: 'bg-blue-50',
+  green: 'bg-green-50',
+  red: 'bg-red-50'
+};
+
+// Bordes y sombras
+const borderClasses = border ? 'border border-gray-200' : '';
+const shadowClasses = {
+  none: '',
+  sm: 'shadow-sm',
+  md: 'shadow-md',
+  lg: 'shadow-lg',
+  xl: 'shadow-xl'
+};
+
+const roundedClasses = {
+  none: '',
+  sm: 'rounded-sm',
+  md: 'rounded-md',
+  lg: 'rounded-lg',
+  xl: 'rounded-xl',
+  full: 'rounded-full'
+};
+
+// Estados
+const stateClasses: string[] = [];
+if (loading) {
+  stateClasses.push('animate-pulse');
+}
+
+// Clases finales
+const finalClasses = [
+  ...baseClasses,
+  responsive ? sizeClasses[size] : '',
+  maxWidth ? `max-w-[${maxWidth}]` : '',
+  paddingX ? paddingXClasses : paddingClasses[padding],
+  paddingY ? paddingYClasses : '',
+  alignClasses[align],
+  textAlignClasses[textAlign],
+  themeClasses[theme],
+  backgroundClasses[background],
+  borderClasses,
+  shadowClasses[shadow],
+  roundedClasses[rounded],
+  ...stateClasses,
+  additionalClasses
+].filter(Boolean).join(' ');
+---
+
+<div class={finalClasses}>
+  {loading ? (
+    <!-- Estado de carga -->
+    <div class="animate-pulse">
+      <div class="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+      <div class="h-4 bg-gray-300 rounded w-1/2 mb-2"></div>
+      <div class="h-4 bg-gray-300 rounded w-5/6"></div>
+    </div>
+  ) : (
+    <slot />
+  )}
+</div>

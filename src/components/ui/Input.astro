@@ -1,0 +1,235 @@
+---
+// src/components/ui/Input.astro
+// Componente Input reutilizable con múltiples variantes
+
+export interface Props {
+  // Atributos básicos
+  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search';
+  name?: string;
+  value?: string;
+  placeholder?: string;
+  
+  // Estados
+  disabled?: boolean;
+  readonly?: boolean;
+  required?: boolean;
+  loading?: boolean;
+  
+  // Validación
+  error?: string;
+  success?: boolean;
+  warning?: boolean;
+  
+  // Apariencia
+  variant?: 'default' | 'filled' | 'outlined' | 'minimal';
+  size?: 'sm' | 'md' | 'lg';
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+  
+  // Iconos
+  icon?: string;
+  iconPosition?: 'left' | 'right';
+  clearable?: boolean;
+  
+  // Tema
+  theme?: 'light' | 'dark' | 'auto';
+  
+  // Accesibilidad
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  
+  // Clases adicionales
+  class?: string;
+  inputClass?: string;
+  labelClass?: string;
+  errorClass?: string;
+}
+
+const {
+  type = 'text',
+  name,
+  value = '',
+  placeholder,
+  disabled = false,
+  readonly = false,
+  required = false,
+  loading = false,
+  error,
+  success = false,
+  warning = false,
+  variant = 'default',
+  size = 'md',
+  rounded = 'md',
+  icon,
+  iconPosition = 'left',
+  clearable = false,
+  theme = 'auto',
+  ariaLabel,
+  ariaDescribedBy,
+  class: additionalClasses = '',
+  inputClass = '',
+  labelClass = '',
+  errorClass = ''
+} = Astro.props;
+
+// Referencia para silenciar hint si labelClass no se utiliza en ciertos casos
+void labelClass;
+
+// ID único para accesibilidad
+const inputId = `input-${Math.random().toString(36).slice(2, 11)}`;
+const errorId = error ? `${inputId}-error` : undefined;
+
+// Clases base del contenedor
+const containerClasses = [
+  'relative w-full',
+  additionalClasses
+].filter(Boolean).join(' ');
+
+// Clases base del input
+const baseInputClasses = [
+  'w-full transition-all duration-200',
+  'focus:outline-none focus:ring-2 focus:ring-offset-2',
+  'disabled:opacity-50 disabled:cursor-not-allowed',
+  'placeholder-gray-400'
+];
+
+// Variantes
+const variantClasses = {
+  default: 'border border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500',
+  filled: 'border-0 bg-gray-100 focus:bg-white focus:ring-blue-500',
+  outlined: 'border-2 border-gray-300 bg-transparent focus:border-blue-500 focus:ring-blue-500',
+  minimal: 'border-0 border-b-2 border-transparent bg-transparent focus:border-blue-500 focus:ring-transparent'
+};
+
+// Tamaños
+const sizeClasses = {
+  sm: 'px-3 py-2 text-sm',
+  md: 'px-4 py-3 text-base',
+  lg: 'px-5 py-4 text-lg'
+};
+
+// Bordes redondeados
+const roundedClasses = {
+  none: 'rounded-none',
+  sm: 'rounded-sm',
+  md: 'rounded-md',
+  lg: 'rounded-lg',
+  full: 'rounded-full'
+};
+
+// Tema
+const themeClasses = {
+  light: '',
+  dark: 'dark',
+  auto: ''
+};
+
+// Estados
+const stateClasses: string[] = [];
+if (error) {
+  stateClasses.push('border-red-500 focus:border-red-500 focus:ring-red-500');
+}
+if (success) {
+  stateClasses.push('border-green-500 focus:border-green-500 focus:ring-green-500');
+}
+if (warning) {
+  stateClasses.push('border-yellow-500 focus:border-yellow-500 focus:ring-yellow-500');
+}
+if (icon && iconPosition === 'left') {
+  stateClasses.push('pl-10');
+}
+if (icon && iconPosition === 'right') {
+  stateClasses.push('pr-10');
+}
+if (clearable) {
+  stateClasses.push('pr-10');
+}
+
+// Clases finales del input
+const inputClasses = [
+  ...baseInputClasses,
+  variantClasses[variant],
+  sizeClasses[size],
+  roundedClasses[rounded],
+  themeClasses[theme],
+  ...stateClasses,
+  inputClass
+].filter(Boolean).join(' ');
+
+// Clases del error
+const finalErrorClasses = [
+  'mt-1 text-sm text-red-600',
+  errorClass
+].filter(Boolean).join(' ');
+---
+
+<div class={containerClasses}>
+  <!-- Input -->
+  <div class="relative">
+    <input
+      id={inputId}
+      type={type}
+      name={name}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled || loading}
+      readonly={readonly}
+      required={required}
+      class={inputClasses}
+      aria-label={ariaLabel}
+      aria-describedby={errorId || ariaDescribedBy}
+      aria-invalid={error ? 'true' : 'false'}
+    />
+    
+    <!-- Icono izquierdo -->
+    {icon && iconPosition === 'left' && (
+      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <slot name="icon">{icon}</slot>
+      </div>
+    )}
+    
+    <!-- Icono derecho -->
+    {icon && iconPosition === 'right' && (
+      <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+        <slot name="icon">{icon}</slot>
+      </div>
+    )}
+    
+    <!-- Botón de limpiar -->
+    {clearable && value && (
+      <button
+        type="button"
+        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+        onclick="this.previousElementSibling.value = ''"
+        aria-label="Limpiar campo"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+        </svg>
+      </button>
+    )}
+    
+    <!-- Spinner de carga -->
+    {loading && (
+      <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+        <svg class="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    )}
+  </div>
+  
+  <!-- Mensaje de error -->
+  {error && (
+    <p id={errorId} class={finalErrorClasses} role="alert">
+      {error}
+    </p>
+  )}
+  
+  <!-- Mensaje de éxito -->
+  {success && !error && (
+    <p class="mt-1 text-sm text-green-600" role="status">
+      ✓ Campo válido
+    </p>
+  )}
+</div>

@@ -1,0 +1,416 @@
+---
+// src/components/dashboard/WorkspacesViewIsland.astro
+// Server Island para vista de workspaces - renderiza lista de workspaces del usuario
+
+import WorkspaceCard from '../workspace/WorkspaceCard.astro';
+void WorkspaceCard;
+
+// Props para recibir userId y workspaces iniciales
+interface Props {
+  userId?: string;
+  initialWorkspaces?: Array<any>;
+  showCreateButton?: boolean;
+}
+
+const { 
+  userId,
+  initialWorkspaces = [], 
+  showCreateButton = true 
+} = Astro.props;
+
+// En el servidor, pre-cargar workspaces si se proporciona userId
+let serverWorkspaces = [...initialWorkspaces];
+try {
+  if (userId && serverWorkspaces.length === 0) {
+    const { getUserWorkspaces } = await import('../../firebase/api');
+    serverWorkspaces = await getUserWorkspaces(userId);
+  }
+  console.log('🏝️ WorkspacesViewIsland: Renderizando en servidor con', serverWorkspaces.length, 'workspaces');
+} catch (e) {
+  console.error('❌ WorkspacesViewIsland: Error cargando workspaces en servidor:', e);
+}
+---
+
+<div id="workspaces-view" class="workspaces-view-island" data-island="workspaces-view">
+  
+  <!-- Header de la vista -->
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-800">
+        TUS ESPACIOS DE TRABAJO
+      </h1>
+      <p class="text-gray-600 mt-1">
+        Organiza tus proyectos y colabora con tu equipo
+      </p>
+    </div>
+    
+    {showCreateButton && (
+      <button 
+        id="create-workspace-btn-main"
+        class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        <span>Nuevo Workspace</span>
+      </button>
+    )}
+  </div>
+  
+  <!-- Grid de workspaces -->
+  <div id="workspaces-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    
+    <!-- Estado de carga inicial (renderizado en servidor) -->
+    <div id="loading-state" class="col-span-full">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3].map(() => (
+          <div class="animate-pulse">
+            <div class="bg-white rounded-lg border border-gray-200 p-6">
+              <div class="flex items-center space-x-3 mb-4">
+                <div class="w-12 h-12 bg-gray-300 rounded-lg"></div>
+                <div class="flex-1">
+                  <div class="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+                  <div class="h-3 bg-gray-300 rounded w-1/2"></div>
+                </div>
+              </div>
+              <div class="space-y-2 mb-4">
+                <div class="h-3 bg-gray-300 rounded"></div>
+                <div class="h-3 bg-gray-300 rounded w-5/6"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="h-3 bg-gray-300 rounded"></div>
+                <div class="h-3 bg-gray-300 rounded"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <!-- Los workspaces reales se insertarán aquí dinámicamente -->
+  </div>
+  
+  <!-- Estado vacío (se muestra cuando no hay workspaces) -->
+  <div id="empty-state" class="hidden col-span-full text-center py-16">
+    <div class="max-w-md mx-auto">
+      <div class="text-gray-400 mb-6">
+        <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+      </div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-3">
+        ¡Comienza tu primer workspace!
+      </h3>
+      <p class="text-gray-600 mb-6">
+        Los workspaces te ayudan a organizar proyectos y colaborar con tu equipo. 
+        Crea uno para empezar.
+      </p>
+      {showCreateButton && (
+        <button 
+          class="create-workspace-btn bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+        >
+          Crear Mi Primer Workspace
+        </button>
+      )}
+    </div>
+  </div>
+  
+  <!-- Estado de error -->
+  <div id="error-state" class="hidden col-span-full text-center py-16">
+    <div class="max-w-md mx-auto">
+      <div class="text-red-400 mb-4">
+        <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 mb-2">
+        Error al cargar workspaces
+      </h3>
+      <p class="text-gray-600 mb-4" id="error-message">
+        Ha ocurrido un error inesperado
+      </p>
+      <button 
+        id="retry-btn"
+        class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+      >
+        Reintentar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Script hidratado para funcionalidad interactiva
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { auth } from '../../firebase/auth';
+  import { subscribeToUserWorkspaces } from '../../firebase/api';
+  import type { Workspace } from '../../types/domain';
+  import type { Unsubscribe } from 'firebase/firestore';
+  import { formatRelativeTime } from '../../utils/date.utils';
+
+  console.log('🏝️ WorkspacesViewIsland: Hidratando en cliente');
+
+  // Estado del componente
+  interface ComponentState {
+    workspaces: Workspace[];
+    loading: boolean;
+    error: string | null;
+    user: any | null;
+  }
+
+  let state: ComponentState = {
+    workspaces: [],
+    loading: true,
+    error: null,
+    user: null
+  };
+
+  let workspacesUnsubscribe: Unsubscribe | null = null;
+
+  // Elementos del DOM
+  const elements = {
+    grid: document.getElementById('workspaces-grid'),
+    loadingState: document.getElementById('loading-state'),
+    emptyState: document.getElementById('empty-state'),
+    errorState: document.getElementById('error-state'),
+    errorMessage: document.getElementById('error-message'),
+    retryBtn: document.getElementById('retry-btn'),
+    createBtn: document.getElementById('create-workspace-btn-main')
+  };
+
+  // Función para renderizar workspaces
+  function renderWorkspaces(workspaces: Workspace[]) {
+    if (!elements.grid) return;
+
+    console.log('🏝️ WorkspacesViewIsland: Renderizando', workspaces.length, 'workspaces');
+
+    // Ocultar estados
+    hideAllStates();
+
+    if (workspaces.length === 0) {
+      elements.emptyState?.classList.remove('hidden');
+      return;
+    }
+
+    // Generar HTML de tarjetas de workspaces
+    const workspacesHTML = workspaces.map(workspace => {
+      // Calcular estadísticas
+      const memberCount = workspace.members?.length || 0;
+      const boardCount = workspace.boards?.length || 0;
+      const lastActivity = workspace.updatedAt ? new Date(workspace.updatedAt) : null;
+      const isOwner = state.user && workspace.ownerId === state.user.uid;
+      
+      // Determinar color basado en el ID (consistente)
+      const colors = ['blue', 'green', 'purple', 'pink', 'indigo'];
+      const colorIndex = workspace.id.charCodeAt(0) % colors.length;
+      const color = colors[colorIndex];
+
+      return `
+        <div class="workspace-card-container" data-workspace-id="${workspace.id}">
+          <a href="/workspace/${workspace.id}/boards" class="block p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200">
+            
+            <!-- Header con avatar -->
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="w-12 h-12 bg-${color}-500 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md">
+                ${workspace.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-lg font-semibold text-gray-900 truncate">${workspace.name}</h3>
+                ${workspace.description ? `<p class="text-sm text-gray-600 truncate">${workspace.description}</p>` : ''}
+              </div>
+              ${isOwner ? `
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
+                  </svg>
+                  Propietario
+                </span>
+              ` : ''}
+            </div>
+            
+            <!-- Estadísticas -->
+            <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+              <div class="flex items-center space-x-2 text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <span>${boardCount} ${boardCount === 1 ? 'tablero' : 'tableros'}</span>
+              </div>
+              
+              <div class="flex items-center space-x-2 text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197H9m3 0a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>${memberCount} ${memberCount === 1 ? 'miembro' : 'miembros'}</span>
+              </div>
+            </div>
+            
+            <!-- Footer con actividad -->
+            <div class="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-gray-100">
+              <div class="flex items-center space-x-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>
+                  ${lastActivity ? `Actualizado ${formatRelativeTime(lastActivity)}` : 'Sin actividad reciente'}
+                </span>
+              </div>
+              
+              <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+              </div>
+            </div>
+          </a>
+        </div>
+      `;
+    }).join('');
+
+    // Actualizar el grid
+    elements.grid.innerHTML = workspacesHTML;
+  }
+
+  // Función para ocultar todos los estados
+  function hideAllStates() {
+    elements.loadingState?.classList.add('hidden');
+    elements.emptyState?.classList.add('hidden');
+    elements.errorState?.classList.add('hidden');
+  }
+
+  // Función para mostrar estado de error
+  function showError(message: string) {
+    hideAllStates();
+    elements.errorState?.classList.remove('hidden');
+    if (elements.errorMessage) {
+      elements.errorMessage.textContent = message;
+    }
+  }
+
+  // Función para cargar workspaces
+  function loadWorkspaces(user: any) {
+    if (!user) {
+      state.workspaces = [];
+      state.loading = false;
+      renderWorkspaces([]);
+      return;
+    }
+
+    console.log('🏝️ WorkspacesViewIsland: Cargando workspaces para usuario', user.uid);
+
+    // Limpiar suscripción anterior
+    if (workspacesUnsubscribe) {
+      workspacesUnsubscribe();
+    }
+
+    try {
+      // Suscribirse a workspaces del usuario
+      workspacesUnsubscribe = subscribeToUserWorkspaces(user.uid, (workspaces) => {
+        console.log('🏝️ WorkspacesViewIsland: Workspaces actualizados:', workspaces);
+        
+        state.workspaces = workspaces;
+        state.loading = false;
+        state.error = null;
+        
+        renderWorkspaces(workspaces);
+      });
+    } catch (error) {
+      console.error('🏝️ WorkspacesViewIsland: Error cargando workspaces:', error);
+      state.loading = false;
+      state.error = 'Error al cargar los workspaces';
+      showError('Error al cargar los workspaces');
+    }
+  }
+
+  // Handler para crear workspace
+  function handleCreateWorkspace() {
+    // Dispatch event personalizado
+    const event = new CustomEvent('create-workspace-requested', {
+      detail: { source: 'workspaces-view' }
+    });
+    document.dispatchEvent(event);
+  }
+
+  // Handler para reintentar
+  function handleRetry() {
+    if (state.user) {
+      state.loading = true;
+      elements.loadingState?.classList.remove('hidden');
+      hideAllStates();
+      setTimeout(() => loadWorkspaces(state.user), 500);
+    }
+  }
+
+  // Inicialización del island
+  function initializeWorkspacesViewIsland() {
+    console.log('🏝️ WorkspacesViewIsland: Inicializando...');
+
+    // Event listeners
+    elements.createBtn?.addEventListener('click', handleCreateWorkspace);
+    elements.retryBtn?.addEventListener('click', handleRetry);
+    
+    // También escuchar clicks en botones de crear del estado vacío
+    document.querySelectorAll('.create-workspace-btn').forEach(btn => {
+      btn.addEventListener('click', handleCreateWorkspace);
+    });
+
+    // Suscribirse a cambios de autenticación
+    onAuthStateChanged(auth, (user) => {
+      state.user = user;
+      
+      if (user) {
+        console.log('🏝️ WorkspacesViewIsland: Usuario autenticado');
+        loadWorkspaces(user);
+      } else {
+        console.log('🏝️ WorkspacesViewIsland: Usuario no autenticado');
+        state.workspaces = [];
+        state.loading = false;
+        renderWorkspaces([]);
+      }
+    });
+  }
+
+  // Cleanup
+  function cleanupWorkspacesViewIsland() {
+    if (workspacesUnsubscribe) {
+      workspacesUnsubscribe();
+      workspacesUnsubscribe = null;
+    }
+  }
+
+  // Auto-inicialización
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeWorkspacesViewIsland);
+  } else {
+    initializeWorkspacesViewIsland();
+  }
+
+  // Cleanup en beforeunload
+  window.addEventListener('beforeunload', cleanupWorkspacesViewIsland);
+
+  // API pública para debugging
+  (window as any).workspacesViewIsland = {
+    state: () => state,
+    loadWorkspaces,
+    renderWorkspaces,
+    cleanup: cleanupWorkspacesViewIsland
+  };
+</script>
+
+<style>
+  /* Estilos específicos del WorkspacesViewIsland */
+  .workspaces-view-island {
+    min-height: 400px;
+  }
+  
+  .workspace-card-container a:hover .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+  
+  /* Fix para Tailwind dinámico */
+  .bg-blue-500 { background-color: #3b82f6; }
+  .bg-green-500 { background-color: #10b981; }
+  .bg-purple-500 { background-color: #8b5cf6; }
+  .bg-pink-500 { background-color: #ec4899; }
+  .bg-indigo-500 { background-color: #6366f1; }
+</style>

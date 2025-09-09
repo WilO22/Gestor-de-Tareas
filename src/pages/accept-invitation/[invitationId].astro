@@ -1,0 +1,416 @@
+---
+// src/pages/accept-invitation/[invitationId].astro
+// Página para aceptar invitaciones por email
+// Permite a los usuarios invitados aceptar o rechazar invitaciones a workspaces
+
+import Layout from '../../layouts/Layout.astro';
+
+const { invitationId } = Astro.params;
+
+// Verificar que el invitationId existe
+if (!invitationId) {
+  throw new Error('ID de invitación no válido');
+}
+---
+
+<Layout title="Aceptar Invitación">
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+      
+      <!-- Loading State -->
+      <div id="loading-state" class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Cargando invitación...</h2>
+        <p class="text-gray-600 text-sm">Verificando los detalles de tu invitación</p>
+      </div>
+
+      <!-- Invitation Details -->
+      <div id="invitation-details" class="hidden">
+        <div class="text-center mb-6">
+          <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+          </div>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Invitación a Workspace</h1>
+          <p class="text-gray-600">Has sido invitado a colaborar</p>
+        </div>
+
+        <!-- Invitation Info -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+          <div class="space-y-3">
+            <div>
+              <span class="text-sm font-medium text-gray-500">Workspace:</span>
+              <p id="workspace-name" class="text-gray-900 font-semibold">Cargando...</p>
+            </div>
+            <div>
+              <span class="text-sm font-medium text-gray-500">Invitado por:</span>
+              <p id="inviter-name" class="text-gray-900">Cargando...</p>
+            </div>
+            <div id="message-container" class="hidden">
+              <span class="text-sm font-medium text-gray-500">Mensaje:</span>
+              <p id="invitation-message" class="text-gray-700 italic">Cargando...</p>
+            </div>
+            <div>
+              <span class="text-sm font-medium text-gray-500">Fecha de invitación:</span>
+              <p id="invitation-date" class="text-gray-900 text-sm">Cargando...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-3">
+          <button 
+            id="accept-btn"
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span>Aceptar Invitación</span>
+          </button>
+          
+          <button 
+            id="reject-btn"
+            class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            <span>Rechazar Invitación</span>
+          </button>
+        </div>
+
+        <div class="mt-6 text-center">
+          <a href="/login" class="text-blue-600 hover:text-blue-800 text-sm underline">
+            ¿No tienes cuenta? Regístrate primero
+          </a>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div id="error-state" class="hidden text-center">
+        <div class="bg-red-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Invitación no válida</h2>
+        <p id="error-message" class="text-gray-600 text-sm mb-4">No se pudo cargar esta invitación</p>
+        <a href="/" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+          Ir al inicio
+        </a>
+      </div>
+
+      <!-- Success State -->
+      <div id="success-state" class="hidden text-center">
+        <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">¡Invitación aceptada!</h2>
+        <p class="text-gray-600 text-sm mb-4">Ya puedes acceder al workspace</p>
+        <a href="/dashboard" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+          Ir al Dashboard
+        </a>
+      </div>
+
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { auth } from '../../firebase/auth';
+  import { doc, getDoc, updateDoc, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
+  import { db } from '../../firebase/client';
+  import { onAuthStateChanged } from 'firebase/auth';
+  import type { Invitation } from '../../types/domain';
+
+  // // Obtener el ID de la invitación desde la URL
+  const invitationId = window.location.pathname.split('/').pop();
+  
+  let currentInvitation: Invitation | null = null;
+  let currentUser: any = null;
+
+  // // Estados de la UI
+  const loadingState = document.getElementById('loading-state');
+  const invitationDetails = document.getElementById('invitation-details');
+  const errorState = document.getElementById('error-state');
+  const successState = document.getElementById('success-state');
+
+  // // Elementos de información
+  const workspaceName = document.getElementById('workspace-name');
+  const inviterName = document.getElementById('inviter-name');
+  const invitationMessage = document.getElementById('invitation-message');
+  const messageContainer = document.getElementById('message-container');
+  const invitationDate = document.getElementById('invitation-date');
+  const errorMessage = document.getElementById('error-message');
+
+  // // Botones de acción
+  const acceptBtn = document.getElementById('accept-btn');
+  const rejectBtn = document.getElementById('reject-btn');
+
+  /**
+   * Cargar datos de la invitación
+   */
+  async function loadInvitationData() {
+    try {
+      if (!invitationId) {
+        throw new Error('ID de invitación no válido');
+      }
+
+      console.log('🔍 Cargando invitación:', invitationId);
+      console.log('🔍 Estado de auth actual:', currentUser ? 'Autenticado' : 'No autenticado');
+      console.log('🔍 UID del usuario:', currentUser?.uid || 'Sin UID');
+
+      // // DEBUGGING: Verificar conectividad con Firestore
+      console.log('🔍 Verificando conexión a Firestore...');
+      console.log('🔍 Base de datos:', db);
+
+      // // Obtener la invitación de Firestore
+      console.log('🔍 Intentando obtener documento de invitación...');
+      console.log('🔍 Firestore config:', { projectId: db.app.options.projectId });
+      
+      try {
+        const invitationDoc = await getDoc(doc(db, 'invitations', invitationId));
+        
+        console.log('🔍 Documento obtenido:', invitationDoc);
+        console.log('🔍 Documento existe:', invitationDoc.exists());
+        
+        if (!invitationDoc.exists()) {
+          console.log('❌ Documento de invitación no encontrado');
+          
+          // // DEBUGGING EXTRA: Verificar si hay algún documento en la colección
+          console.log('🔍 Verificando colección de invitaciones...');
+          const testQuery = query(collection(db, 'invitations'), limit(5));
+          const testSnapshot = await getDocs(testQuery);
+          console.log('🔍 Documentos en invitaciones:', testSnapshot.size);
+          
+          testSnapshot.docs.forEach((doc, index) => {
+            console.log(`🔍 Documento ${index + 1}:`, doc.id, doc.data());
+          });
+          
+          throw new Error('Invitación no encontrada');
+        }
+
+        console.log('✅ Documento encontrado, obteniendo datos...');
+        const invitationData = invitationDoc.data();
+        console.log('🔍 Datos de la invitación:', invitationData);
+        
+        // // Procesar datos de la invitación
+        currentInvitation = {
+          id: invitationDoc.id,
+          workspaceId: invitationData.workspaceId,
+          inviterUserId: invitationData.inviterUserId,
+          inviteeEmail: invitationData.inviteeEmail,
+          message: invitationData.message,
+          status: invitationData.status,
+          createdAt: invitationData.createdAt?.toDate() || new Date(),
+          sentAt: invitationData.sentAt?.toDate(),
+          acceptedAt: invitationData.acceptedAt?.toDate(),
+          rejectedAt: invitationData.rejectedAt?.toDate(),
+          acceptedByUserId: invitationData.acceptedByUserId,
+          expiresAt: invitationData.expiresAt?.toDate() || new Date(),
+          error: invitationData.error
+        };
+        
+        // // MEJORADO: Verificar estado de la invitación con información específica
+        if (currentInvitation.status === 'accepted') {
+          console.log('✅ Invitación ya aceptada previamente');
+          showAlreadyAccepted();
+          return; // // Salir sin error, mostrar estado de éxito
+        }
+        
+        if (currentInvitation.status === 'rejected') {
+          throw new Error('Esta invitación fue rechazada');
+        }
+        
+        if (currentInvitation.expiresAt && currentInvitation.expiresAt < new Date()) {
+          throw new Error('Esta invitación ha expirado');
+        }
+
+        // // CORREGIDO: Usar los campos de respaldo de la invitación para evitar problemas de permisos
+        // // Ya no necesitamos hacer consultas adicionales a workspaces y users
+        const workspaceNameText = invitationData.workspaceName || 'Workspace desconocido';
+        const inviterNameText = invitationData.inviterName || 'Usuario desconocido';
+
+        // // Actualizar UI con los datos de respaldo
+        if (workspaceName) workspaceName.textContent = workspaceNameText;
+        if (inviterName) inviterName.textContent = inviterNameText;
+        
+        if (currentInvitation.message && invitationMessage && messageContainer) {
+          invitationMessage.textContent = currentInvitation.message;
+          messageContainer.classList.remove('hidden');
+        }
+        
+        if (invitationDate) {
+          invitationDate.textContent = currentInvitation.createdAt.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        }
+
+        // // Mostrar detalles de la invitación
+        loadingState?.classList.add('hidden');
+        invitationDetails?.classList.remove('hidden');
+
+        console.log('✅ Invitación cargada correctamente');
+        
+      } catch (firestoreError) {
+        console.error('❌ Error específico de Firestore:', firestoreError);
+        throw firestoreError;
+      }
+
+    } catch (error) {
+      console.error('❌ Error cargando invitación:', error);
+      showError(error instanceof Error ? error.message : 'Error desconocido');
+    }
+  }
+
+  /**
+   * Mostrar estado de error
+   */
+  function showError(message: string) {
+    if (errorMessage) errorMessage.textContent = message;
+    loadingState?.classList.add('hidden');
+    invitationDetails?.classList.add('hidden');
+    errorState?.classList.remove('hidden');
+  }
+
+  /**
+   * Mostrar estado de éxito
+   */
+  function showSuccess() {
+    loadingState?.classList.add('hidden');
+    invitationDetails?.classList.add('hidden');
+    successState?.classList.remove('hidden');
+  }
+
+  /**
+   * NUEVO: Mostrar estado de invitación ya aceptada
+   */
+  function showAlreadyAccepted() {
+    loadingState?.classList.add('hidden');
+    invitationDetails?.classList.add('hidden');
+    
+    // // Modificar el estado de éxito para mostrar que ya fue aceptada
+    if (successState) {
+      // // Cambiar el texto para indicar que ya estaba aceptada
+      const successTitle = successState.querySelector('h2');
+      const successText = successState.querySelector('p');
+      
+      if (successTitle) successTitle.textContent = '✅ Invitación ya aceptada';
+      if (successText) successText.textContent = 'Esta invitación fue aceptada anteriormente. Ya tienes acceso al workspace.';
+      
+      successState.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Aceptar invitación
+   */
+  async function acceptInvitation() {
+    try {
+      if (!currentUser) {
+        // // MEJORADO: Redirigir a login con información de la invitación
+        const loginUrl = `/login?returnTo=${encodeURIComponent(window.location.pathname)}&inviteeEmail=${encodeURIComponent(currentInvitation?.inviteeEmail || '')}`;
+        alert('Debes iniciar sesión para aceptar esta invitación. Serás redirigido al login.');
+        window.location.href = loginUrl;
+        return;
+      }
+
+      if (!currentInvitation) {
+        throw new Error('No hay invitación para aceptar');
+      }
+
+      console.log('✅ Aceptando invitación...');
+
+      // // Actualizar estado de la invitación
+      await updateDoc(doc(db, 'invitations', currentInvitation.id), {
+        status: 'accepted',
+        acceptedAt: new Date(),
+        acceptedByUserId: currentUser.uid
+      });
+
+      // // MEJORA: Agregar usuario como miembro del workspace en frontend
+      // // Crear documento de membresía del workspace
+      await addDoc(collection(db, 'workspace_members'), {
+        workspaceId: currentInvitation.workspaceId,
+        userId: currentUser.uid,
+        role: 'member',  // Rol por defecto para invitados
+        joinedAt: new Date(),
+        invitationId: currentInvitation.id  // Referencia a la invitación
+      });
+
+      console.log('✅ Invitación aceptada exitosamente');
+      showSuccess();
+
+    } catch (error) {
+      console.error('❌ Error aceptando invitación:', error);
+      alert('Error aceptando la invitación. Inténtalo de nuevo.');
+    }
+  }
+
+  /**
+   * Rechazar invitación
+   */
+  async function rejectInvitation() {
+    try {
+      if (!currentUser) {
+        // // MEJORADO: Redirigir a login con información de la invitación
+        const loginUrl = `/login?returnTo=${encodeURIComponent(window.location.pathname)}&inviteeEmail=${encodeURIComponent(currentInvitation?.inviteeEmail || '')}`;
+        alert('Debes iniciar sesión para rechazar esta invitación. Serás redirigido al login.');
+        window.location.href = loginUrl;
+        return;
+      }
+
+      if (!currentInvitation) {
+        throw new Error('No hay invitación para rechazar');
+      }
+
+      if (confirm('¿Estás seguro de que quieres rechazar esta invitación?')) {
+        console.log('❌ Rechazando invitación...');
+
+        await updateDoc(doc(db, 'invitations', currentInvitation.id), {
+          status: 'rejected',
+          rejectedAt: new Date(),
+          acceptedByUserId: currentUser.uid // Para tracking
+        });
+
+        console.log('✅ Invitación rechazada');
+        alert('Invitación rechazada');
+        window.location.href = '/';
+      }
+
+    } catch (error) {
+      console.error('❌ Error rechazando invitación:', error);
+      alert('Error rechazando la invitación. Inténtalo de nuevo.');
+    }
+  }
+
+  // // Event listeners
+  acceptBtn?.addEventListener('click', acceptInvitation);
+  rejectBtn?.addEventListener('click', rejectInvitation);
+
+  // // CORREGIDO: Variable para controlar si ya se intentó cargar la invitación
+  let authStateInitialized = false;
+
+  // // Monitorear estado de autenticación
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    console.log('👤 Estado de auth:', user ? 'Autenticado' : 'No autenticado');
+    
+    // // CORREGIDO: Solo ejecutar una vez cuando auth se haya inicializado
+    if (!authStateInitialized) {
+      authStateInitialized = true;
+      console.log('🔄 Auth inicializado, cargando invitación...');
+    }
+  });
+
+  // // NUEVA LÓGICA: Cargar invitación inmediatamente (las reglas de Firestore lo permiten)
+  // // Esto permite mostrar la invitación sin necesidad de estar autenticado
+  console.log('🚀 Iniciando carga inmediata de invitación...');
+  loadInvitationData();
+</script>

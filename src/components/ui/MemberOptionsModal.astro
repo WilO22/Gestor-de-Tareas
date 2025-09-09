@@ -1,0 +1,201 @@
+---
+// // src/components/ui/MemberOptionsModal.astro
+// // Modal reutilizable para opciones de miembros
+// // REFACTORIZACIÓN: Componente especializado para evitar HTML inline
+
+interface Props {
+  id?: string;
+}
+
+const { id = 'member-options-modal' } = Astro.props;
+---
+
+<!-- // Modal para opciones de miembros (se muestra/oculta dinámicamente) -->
+<div id={id} class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+  
+  <div class="relative flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 border-b border-gray-200">
+        <h3 id="modal-title" class="text-lg font-semibold text-gray-800">Opciones de Miembro</h3>
+        <button class="modal-close text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Content -->
+      <div id="modal-content" class="p-4">
+        <!-- El contenido se inserta dinámicamente aquí -->
+      </div>
+      
+      <!-- Footer -->
+      <div id="modal-footer" class="flex justify-end space-x-2 p-4 border-t border-gray-200">
+        <button class="modal-cancel px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+          Cancelar
+        </button>
+        <button id="modal-action" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // // Script del modal reutilizable
+  interface ModalOptions {
+    title?: string;
+    content?: string;
+    actionText?: string;
+    onAction?: () => void | Promise<void>;
+    onCancel?: () => void;
+  }
+  
+  class MemberOptionsModal {
+    private modal: HTMLElement;
+    private titleElement: HTMLElement;
+    private contentElement: HTMLElement;
+    private actionButton: HTMLElement;
+    private isVisible: boolean = false;
+    
+    constructor(modalId: string = 'member-options-modal') {
+      this.modal = document.getElementById(modalId)!;
+      this.titleElement = document.getElementById('modal-title')!;
+      this.contentElement = document.getElementById('modal-content')!;
+      this.actionButton = document.getElementById('modal-action')!;
+      
+      this.setupEventListeners();
+    }
+    
+    private setupEventListeners() {
+      // // Cerrar modal
+      this.modal.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
+        btn.addEventListener('click', () => this.hide());
+      });
+      
+      // // Cerrar al hacer clic en el overlay
+      this.modal.addEventListener('click', (e) => {
+        if (e.target === this.modal) {
+          this.hide();
+        }
+      });
+      
+      // // Cerrar con Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.isVisible) {
+          this.hide();
+        }
+      });
+    }
+    
+    show(options: ModalOptions) {
+      // // Configurar contenido
+      if (options.title) {
+        this.titleElement.textContent = options.title;
+      }
+      
+      if (options.content) {
+        this.contentElement.innerHTML = options.content;
+      }
+      
+      if (options.actionText) {
+        this.actionButton.textContent = options.actionText;
+      }
+      
+      // // Configurar acción
+      if (options.onAction) {
+        this.actionButton.onclick = async () => {
+          try {
+            await options.onAction!();
+            this.hide();
+          } catch (error) {
+            console.error('Error en acción del modal:', error);
+          }
+        };
+      }
+      
+      // // Mostrar modal
+      this.modal.classList.remove('hidden');
+      this.isVisible = true;
+      
+      // // Focus en el primer elemento interactivo
+      const firstInput = this.modal.querySelector('input, select, textarea, button') as HTMLElement;
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+    
+    hide() {
+      this.modal.classList.add('hidden');
+      this.isVisible = false;
+    }
+    
+    isOpen() {
+      return this.isVisible;
+    }
+  }
+  
+  // // Crear instancia global del modal
+  const memberModal = new MemberOptionsModal();
+  
+  // // Hacer disponible globalmente
+  (window as any).MemberOptionsModal = {
+    show: (options: ModalOptions) => memberModal.show(options),
+    hide: () => memberModal.hide(),
+    isOpen: () => memberModal.isOpen()
+  };
+  
+  // // Función helper para crear modales específicos
+  (window as any).showRoleChangeModal = function(workspaceId: string, userId: string, currentRole: string, memberEmail: string) {
+    const content = `
+      <p class="text-sm text-gray-600 mb-4">Cambiar el rol de <strong>${memberEmail}</strong></p>
+      
+      <div class="space-y-2">
+        <label class="flex items-center">
+          <input type="radio" name="new-role" value="admin" class="mr-2" ${currentRole === 'admin' ? 'checked' : ''}>
+          <span class="text-sm">Administrador</span>
+        </label>
+        <label class="flex items-center">
+          <input type="radio" name="new-role" value="member" class="mr-2" ${currentRole === 'member' ? 'checked' : ''}>
+          <span class="text-sm">Miembro</span>
+        </label>
+      </div>
+    `;
+    
+    memberModal.show({
+      title: 'Cambiar Rol',
+      content,
+      actionText: 'Cambiar Rol',
+      onAction: async () => {
+        const selectedRole = (document.querySelector('input[name="new-role"]:checked') as HTMLInputElement)?.value;
+        
+        if (selectedRole && typeof (window as any).MemberManagementUtils?.handleRoleChange === 'function') {
+          await (window as any).MemberManagementUtils.handleRoleChange(
+            { workspaceId, userId, memberEmail, isOwner: false, isCurrentUser: false, canManage: true },
+            selectedRole
+          );
+        }
+      }
+    });
+  };
+</script>
+
+<style>
+  /* // Animaciones suaves para el modal */
+  .fixed {
+    transition: opacity 0.3s ease-in-out;
+  }
+  
+  .hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .fixed:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+</style>

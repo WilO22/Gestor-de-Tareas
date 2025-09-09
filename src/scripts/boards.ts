@@ -5,8 +5,12 @@ import { auth } from '../firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db } from '../firebase/client';
 import { doc, getDoc } from 'firebase/firestore';
-import { createBoard, fetchBoards } from '../firebase/api';
+import { createBoard, subscribeToBoardsInWorkspace } from '../firebase/api';
 import type { Board } from '../types/domain';
+import type { Unsubscribe } from 'firebase/firestore';
+
+// Estado para controlar la suscripción
+let boardsUnsubscribe: Unsubscribe | null = null;
 
 // --- Funciones de Ayuda (Helpers) ---
 
@@ -25,12 +29,28 @@ async function fetchWorkspaceDetails(workspaceId: string) {
   }
 }
 
-// Busca y muestra los tableros de un Espacio de Trabajo
-async function fetchAndRenderBoards(workspaceId: string) {
+// Configura suscripción en tiempo real a tableros del workspace
+function setupBoardsSubscription(workspaceId: string) {
   const boardsGridEl = document.getElementById('boards-grid');
   if (!boardsGridEl) return;
 
-  const boards = await fetchBoards(workspaceId);
+  // Cancelar suscripción anterior si existe
+  if (boardsUnsubscribe) {
+    boardsUnsubscribe();
+    boardsUnsubscribe = null;
+  }
+
+  // Configurar nueva suscripción en tiempo real
+  boardsUnsubscribe = subscribeToBoardsInWorkspace(workspaceId, (boards: Board[]) => {
+    console.log('📊 Tableros actualizados en tiempo real:', boards.length);
+    renderBoards(boards, workspaceId);
+  });
+}
+
+// Renderiza los tableros en el DOM (separada para reutilizar)
+function renderBoards(boards: Board[], workspaceId: string) {
+  const boardsGridEl = document.getElementById('boards-grid');
+  if (!boardsGridEl) return;
   
   boardsGridEl.innerHTML = ''; // Limpiamos el contenido anterior
 
@@ -50,15 +70,21 @@ async function fetchAndRenderBoards(workspaceId: string) {
 
 // --- Función Principal de Inicialización ---
 
-export default function initBoards(workspaceId: string) {
+export default function initBoards(workspaceId?: string) {
   const createBoardForm = document.getElementById('create-board-form');
   const boardNameInput = document.getElementById('board-name') as HTMLInputElement;
 
+  // Si no se pasó workspaceId, intentar leer desde el root dataset
+  if (!workspaceId) {
+    const root = document.getElementById('boards-root');
+    workspaceId = root?.dataset.workspaceId || '';
+  }
+
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      // 1. Cargar todos los datos iniciales
+      // 1. Cargar datos iniciales
       fetchWorkspaceDetails(workspaceId);
-      fetchAndRenderBoards(workspaceId);
+      setupBoardsSubscription(workspaceId); // Usar suscripción en tiempo real
 
       // 2. Preparar el formulario de creación
       createBoardForm?.addEventListener('submit', async (e) => {
@@ -67,7 +93,8 @@ export default function initBoards(workspaceId: string) {
         if(boardName) {
           await createBoard(boardName, workspaceId);
           boardNameInput.value = '';
-          fetchAndRenderBoards(workspaceId); // Refrescar la lista de tableros
+          // No necesitamos refrescar manualmente - la suscripción se encargará
+          console.log('✅ Tablero creado, la suscripción actualizará la lista automáticamente');
         }
       });
     } else {
@@ -75,4 +102,24 @@ export default function initBoards(workspaceId: string) {
       window.location.href = '/login';
     }
   });
+
+  // Limpiar suscripción al salir
+  window.addEventListener('beforeunload', () => {
+    if (boardsUnsubscribe) {
+      boardsUnsubscribe();
+    }
+  });
+}
+
+// Auto-inicialización si el script se carga directamente y el DOM ya contiene #boards-root
+if (typeof window !== 'undefined') {
+  if (document.readyState !== 'loading') {
+    const root = document.getElementById('boards-root');
+    if (root) initBoards(root.dataset.workspaceId);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      const root = document.getElementById('boards-root');
+      if (root) initBoards(root.dataset.workspaceId);
+    });
+  }
 }

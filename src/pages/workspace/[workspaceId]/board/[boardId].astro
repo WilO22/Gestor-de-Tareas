@@ -2,32 +2,38 @@
 //src/pages/workspace/[workspaceId]/board/[boardId].astro
 export const prerender = false;
 import Layout from '../../../../layouts/Layout.astro';
+import BoardHeader from '../../../../components/board/BoardHeader.astro';
 const { workspaceId, boardId } = Astro.params;
 ---
 
 <Layout title="Tablero">
-  <main class="p-8 min-h-screen bg-gray-50">
+  <main id="board-root" data-workspace-id={workspaceId} data-board-id={boardId} class="min-h-screen bg-gray-50">
     {/* Migas de pan: el nombre del workspace se resuelve en el cliente */}
-    <div class="mb-6">
-      <a href="/dashboard" class="text-blue-500 hover:underline">Espacios de Trabajo</a>
-      <span class="text-gray-500">/</span>
-      <a id="workspace-link" href={`/workspace/${workspaceId}/boards`} class="text-blue-500 hover:underline">Cargando...</a>
+    <div class="p-8 pb-0">
+      <div class="mb-6">
+        <a href="/dashboard" class="text-blue-500 hover:underline">Espacios de Trabajo</a>
+        <span class="text-gray-500">/</span>
+        <a id="workspace-link" href={`/workspace/${workspaceId}/boards`} class="text-blue-500 hover:underline">Cargando...</a>
+      </div>
+
+      {/* Título del tablero: se actualiza en el cliente al leer Firebase */}
+      <h1 id="board-title" class="text-3xl font-bold mb-6 text-gray-800">Cargando tablero...</h1>
     </div>
 
-    {/* Título del tablero: se actualiza en el cliente al leer Firebase */}
-    <h1 id="board-title" class="text-3xl font-bold mb-6 text-gray-800">Cargando tablero...</h1>
+    {/* Cabecera del board con buscador y opciones (similar a Trello) */}
+    <BoardHeader />
 
     {/* Contenedor de columnas. Se llena desde /src/scripts/board-page.ts */}
-    <div id="columns-container">
-      <p class="text-gray-600">Cargando columnas...</p>
+    <div class="px-8">
+      <div id="columns-container">
+        <p class="text-gray-600">Cargando columnas...</p>
+      </div>
     </div>
   </main>
   
   {/* Inicializamos la lógica de cliente con los IDs de la ruta */}
-  <script type="module" define:vars={{ workspaceId, boardId }}>
-    import initBoardPage from '/src/scripts/board-page.ts';
-    initBoardPage({ workspaceId, boardId });
-  </script>
+  <!-- Script procesado: inicializador de BoardPage; IDs se leen desde data attrs del root -->
+  <script src="/src/scripts/board-page.ts"></script>
 
   <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
     se generan dinámicamente en el cliente y no reciben el atributo de

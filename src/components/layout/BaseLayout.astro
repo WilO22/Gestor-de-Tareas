@@ -1,0 +1,203 @@
+---
+// src/components/layout/BaseLayout.astro
+// Sistema de layout responsive y reutilizable
+
+export interface Props {
+  // Estructura del layout
+  layout?: 'sidebar' | 'topbar' | 'fullscreen' | 'centered';
+  sidebarPosition?: 'left' | 'right';
+  
+  // Responsive
+  responsive?: boolean;
+  mobileBreakpoint?: 'sm' | 'md' | 'lg';
+  
+  // Espaciado
+  gap?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  padding?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  
+  // Tema
+  theme?: 'light' | 'dark' | 'auto';
+  
+  // Estados
+  loading?: boolean;
+  sticky?: boolean;
+  
+  // Clases adicionales
+  class?: string;
+  containerClass?: string;
+  sidebarClass?: string;
+  mainClass?: string;
+}
+
+const {
+  layout = 'sidebar',
+  sidebarPosition = 'left',
+  responsive = true,
+  mobileBreakpoint = 'md',
+  gap = 'md',
+  padding = 'md',
+  theme = 'auto',
+  loading = false,
+  sticky = false,
+  class: additionalClasses = '',
+  containerClass = '',
+  sidebarClass = '',
+  mainClass = ''
+} = Astro.props;
+
+// Clases base
+const baseClasses = [
+  'min-h-screen w-full',
+  'flex flex-col'
+];
+
+// Layout específico
+const layoutClasses = {
+  sidebar: 'md:flex-row',
+  topbar: 'flex-col',
+  fullscreen: 'flex-col',
+  centered: 'items-center justify-center'
+};
+
+// Posición del sidebar
+const sidebarPositionClasses = {
+  left: 'md:flex-row',
+  right: 'md:flex-row-reverse'
+};
+
+// Breakpoints responsive
+const breakpointClasses = {
+  sm: 'flex-col sm:flex-row',
+  md: 'flex-col md:flex-row',
+  lg: 'flex-col lg:flex-row'
+};
+
+// Espaciado
+const gapClasses = {
+  xs: 'gap-2',
+  sm: 'gap-4',
+  md: 'gap-6',
+  lg: 'gap-8',
+  xl: 'gap-12'
+};
+
+const paddingClasses = {
+  xs: 'p-2',
+  sm: 'p-4',
+  md: 'p-6',
+  lg: 'p-8',
+  xl: 'p-12'
+};
+
+// Tema
+const themeClasses = {
+  light: 'bg-white text-gray-900',
+  dark: 'bg-gray-900 text-white',
+  auto: ''
+};
+
+// Estados
+const stateClasses: string[] = [];
+if (sticky) {
+  stateClasses.push('sticky top-0 z-10');
+}
+if (loading) {
+  stateClasses.push('animate-pulse');
+}
+
+// Clases finales
+const finalClasses = [
+  ...baseClasses,
+  layout === 'sidebar' ? sidebarPositionClasses[sidebarPosition] : layoutClasses[layout],
+  responsive ? breakpointClasses[mobileBreakpoint] : '',
+  gapClasses[gap],
+  paddingClasses[padding],
+  themeClasses[theme],
+  ...stateClasses,
+  additionalClasses
+].filter(Boolean).join(' ');
+
+// Clases para contenedores internos
+const containerClasses = [
+  'flex-1 w-full',
+  containerClass
+].filter(Boolean).join(' ');
+
+const sidebarClasses = [
+  'w-full md:w-64 lg:w-72 xl:w-80',
+  'flex-shrink-0',
+  sidebarClass
+].filter(Boolean).join(' ');
+
+const mainClasses = [
+  'flex-1 min-w-0',
+  'overflow-hidden',
+  mainClass
+].filter(Boolean).join(' ');
+---
+
+<div class={finalClasses}>
+  {loading ? (
+    <!-- Estado de carga -->
+    <div class="animate-pulse space-y-4">
+      <div class="h-16 bg-gray-300 rounded"></div>
+      <div class="flex space-x-4">
+        <div class="w-64 h-96 bg-gray-300 rounded"></div>
+        <div class="flex-1 h-96 bg-gray-300 rounded"></div>
+      </div>
+    </div>
+  ) : (
+    <>
+      <!-- Sidebar slot -->
+      {(layout === 'sidebar' || layout === 'topbar') && (
+        <aside class={sidebarClasses}>
+          <slot name="sidebar" />
+        </aside>
+      )}
+      
+      <!-- Topbar slot -->
+      {layout === 'topbar' && (
+        <header class="w-full border-b border-gray-200">
+          <slot name="topbar" />
+        </header>
+      )}
+      
+      <!-- Main content -->
+      <main class={containerClasses}>
+        <div class={mainClasses}>
+          <slot />
+        </div>
+      </main>
+      
+      <!-- Footer slot -->
+      <slot name="footer" />
+    </>
+  )}
+</div>
+
+<style>
+  /* Estilos adicionales para el layout */
+  @media (max-width: 768px) {
+    .layout-mobile-stack {
+      flex-direction: column !important;
+    }
+  }
+  
+  /* Scrollbar personalizado */
+  .layout-sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .layout-sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  
+  .layout-sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .layout-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+</style>

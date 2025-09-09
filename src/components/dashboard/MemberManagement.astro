@@ -1,0 +1,349 @@
+---
+// // src/components/dashboard/MemberManagement.astro
+// // Componente especializado para gestión de miembros estilo Trello
+// // REFACTORIZACIÓN: Extraído de dashboard.astro para mejor organización
+
+// // Props del componente
+interface Props {
+  workspaceId: string;
+}
+
+const { workspaceId } = Astro.props;
+void workspaceId;
+---
+
+<!-- // Sección de gestión de miembros -->
+<div id="members-management-container" class="bg-white rounded-lg shadow-sm border border-gray-200">
+  <!-- // Header de la sección -->
+  <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+      <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+      </svg>
+      Miembros del Espacio de Trabajo
+    </h3>
+    
+    <!-- // Botón para invitar miembros -->
+    <button 
+      id="invite-member-btn" 
+      class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+      </svg>
+      <span>Invitar Miembro</span>
+    </button>
+  </div>
+
+  <!-- // Lista de miembros actuales -->
+  <div id="members-list" class="p-4">
+    <!-- // Los miembros se cargan dinámicamente aquí -->
+    <div class="text-center text-gray-500 py-8">
+      <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+      </svg>
+      <p>Cargando miembros...</p>
+    </div>
+  </div>
+
+  <!-- // Lista de invitaciones pendientes -->
+  <div id="pending-invitations-section" class="border-t border-gray-200 p-4 hidden">
+    <h4 class="text-md font-semibold text-gray-800 mb-3 flex items-center">
+      <svg class="w-5 h-5 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      Invitaciones Pendientes
+    </h4>
+    <div id="pending-invitations-list">
+      <!-- // Las invitaciones se cargan dinámicamente aquí -->
+    </div>
+  </div>
+</div>
+
+<script>
+  // // SCRIPT MODULAR: Solo funciones relacionadas con gestión de miembros
+  import { getDoc, doc } from 'firebase/firestore';
+  import { db } from '../../firebase/client';
+  import { getWorkspaceInvitations, cancelInvitation } from '../../firebase/invitations';
+  import type { Member, Invitation } from '../../types/domain';
+
+  // // Obtener workspaceId desde el atributo data
+  const workspaceId = document.currentScript?.parentElement?.dataset.workspaceId;
+  
+  if (!workspaceId) {
+    console.error('❌ MemberManagement: workspaceId no encontrado');
+  }
+
+  // // FUNCIÓN: Cargar miembros del workspace
+  async function loadWorkspaceMembers(wsId: string) {
+    const membersList = document.getElementById('members-list');
+    if (!membersList) return;
+    
+    try {
+      membersList.innerHTML = '<div class="text-center text-gray-500 py-8">Cargando miembros...</div>';
+      
+      // // Cargar datos del workspace
+      const workspaceDoc = await getDoc(doc(db, "workspaces", wsId));
+      if (!workspaceDoc.exists()) {
+        throw new Error('Workspace no encontrado');
+      }
+      
+      const workspace = workspaceDoc.data();
+      const members = workspace.members || [];
+      
+      // // Cargar invitaciones pendientes
+      const invitations = await getWorkspaceInvitations(wsId);
+      
+      // // Renderizar miembros
+      renderMembers(members, invitations);
+      
+    } catch (error) {
+      console.error('❌ Error cargando miembros:', error);
+      membersList.innerHTML = '<div class="text-center text-red-500 py-8">Error cargando miembros</div>';
+    }
+  }
+  
+  // // FUNCIÓN: Renderizar lista de miembros
+  function renderMembers(members: Member[], invitations: Invitation[]) {
+    const membersList = document.getElementById('members-list');
+    const pendingSection = document.getElementById('pending-invitations-section');
+    
+    if (!membersList) return;
+    
+    // // Renderizar miembros actuales
+    membersList.innerHTML = members.map(member => createMemberCard(member)).join('');
+    
+    // // Renderizar invitaciones pendientes
+    if (invitations.length > 0 && pendingSection) {
+      pendingSection.classList.remove('hidden');
+      const invitationsList = document.getElementById('pending-invitations-list');
+      if (invitationsList) {
+        invitationsList.innerHTML = invitations.map(invitation => createInvitationCard(invitation)).join('');
+      }
+    } else if (pendingSection) {
+      pendingSection.classList.add('hidden');
+    }
+    
+    // // Configurar event listeners después del render
+    setupMemberEventListeners();
+  }
+  
+  // // FUNCIÓN: Crear tarjeta de miembro
+  function createMemberCard(member: Member): string {
+    const isCurrentUser = member.userId === getCurrentUserId();
+    const isOwner = member.role === 'owner';
+    const canManage = getCurrentUserRole() === 'owner' || getCurrentUserRole() === 'admin';
+    
+    return `
+      <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg mb-3 bg-gray-50">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+            ${(member.displayName || member.email).charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-900">
+              ${member.displayName || member.email.split('@')[0]}
+              ${isCurrentUser ? '<span class="text-xs text-gray-500 ml-1">(tú)</span>' : ''}
+            </h4>
+            <p class="text-sm text-gray-500">${member.email}</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <!-- Role Badge -->
+          <span class="px-2 py-1 text-xs font-medium rounded-full ${getRoleBadgeClass(member.role)}">
+            ${getRoleDisplayName(member.role)}
+          </span>
+          
+          <!-- Options Menu Button -->
+          ${(canManage && !isOwner) || isCurrentUser ? `
+            <button class="member-options-btn text-gray-400 hover:text-gray-600 p-1" 
+                    data-user-id="${member.userId}"
+                    data-member-email="${member.email}"
+                    data-is-owner="${isOwner}"
+                    data-is-current-user="${isCurrentUser}"
+                    data-can-manage="${canManage}"
+                    title="Más opciones">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+              </svg>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+  
+  // // FUNCIÓN: Crear tarjeta de invitación
+  function createInvitationCard(invitation: Invitation): string {
+    return `
+      <div class="flex items-center justify-between p-3 border border-yellow-200 rounded-lg mb-3 bg-yellow-50">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center text-white font-semibold">
+            ${invitation.inviteeEmail.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-900">${invitation.inviteeEmail}</h4>
+            <p class="text-sm text-yellow-600">Invitación pendiente</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button class="copy-invitation-link-btn text-blue-600 hover:text-blue-800 p-1" 
+                  data-invitation-id="${invitation.id}" title="Copiar enlace">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+          </button>
+          <button class="cancel-invitation-btn text-red-600 hover:text-red-800 p-1" 
+                  data-invitation-id="${invitation.id}" title="Cancelar invitación">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+  
+  // // FUNCIÓN: Configurar event listeners de miembros
+  function setupMemberEventListeners() {
+    // // Event listeners para opciones de miembros
+    document.querySelectorAll('.member-options-btn').forEach(btn => {
+      btn.addEventListener('click', handleMemberOptionsClick);
+    });
+    
+    // // Event listeners para invitaciones
+    document.querySelectorAll('.copy-invitation-link-btn').forEach(btn => {
+      btn.addEventListener('click', handleCopyInvitationLink);
+    });
+    
+    document.querySelectorAll('.cancel-invitation-btn').forEach(btn => {
+      btn.addEventListener('click', handleCancelInvitation);
+    });
+  }
+  
+  // // HANDLER: Click en opciones de miembro
+  function handleMemberOptionsClick(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const userId = btn.dataset.userId;
+    const memberEmail = btn.dataset.memberEmail;
+    const isOwner = btn.dataset.isOwner === 'true';
+    const isCurrentUser = btn.dataset.isCurrentUser === 'true';
+    const canManage = btn.dataset.canManage === 'true';
+    
+    if (userId && memberEmail && workspaceId) {
+      showMemberOptionsMenu(btn, {
+        workspaceId,
+        userId,
+        memberEmail,
+        isOwner,
+        isCurrentUser,
+        canManage
+      });
+    }
+  }
+  
+  // // HANDLER: Cancelar invitación
+  async function handleCancelInvitation(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const invitationId = btn.dataset.invitationId;
+    
+    if (!invitationId) return;
+    
+    if (confirm('¿Estás seguro de que quieres cancelar esta invitación?')) {
+      try {
+        const result = await cancelInvitation(invitationId);
+        if (result.success) {
+          // // Recargar miembros
+          if (workspaceId) {
+            await loadWorkspaceMembers(workspaceId);
+          }
+          showToast('Invitación cancelada exitosamente', 'success');
+        } else {
+          showToast('Error cancelando invitación: ' + result.error, 'error');
+        }
+      } catch (error) {
+        console.error('❌ Error cancelando invitación:', error);
+        showToast('Error inesperado cancelando invitación', 'error');
+      }
+    }
+  }
+  
+  // // HANDLER: Copiar enlace de invitación
+  function handleCopyInvitationLink(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const invitationId = btn.dataset.invitationId;
+    
+    if (invitationId) {
+      const invitationUrl = `${window.location.origin}/accept-invitation/${invitationId}`;
+      navigator.clipboard.writeText(invitationUrl).then(() => {
+        showToast('Enlace de invitación copiado al portapapeles', 'success');
+      }).catch(() => {
+        showToast('Error al copiar enlace', 'error');
+      });
+    }
+  }
+  
+  // // FUNCIONES AUXILIARES
+  function getCurrentUserId(): string {
+    return (window as any).currentUser?.id || '';
+  }
+  
+  function getCurrentUserRole(): string {
+    return (window as any).currentUserRole || 'member';
+  }
+  
+  function getRoleBadgeClass(role: string): string {
+    const classes = {
+      owner: 'bg-purple-100 text-purple-800',
+      admin: 'bg-blue-100 text-blue-800',
+      member: 'bg-gray-100 text-gray-800'
+    };
+    return classes[role as keyof typeof classes] || classes.member;
+  }
+  
+  function getRoleDisplayName(role: string): string {
+    const names = {
+      owner: 'Propietario',
+      admin: 'Administrador',
+      member: 'Miembro'
+    };
+    return names[role as keyof typeof names] || 'Miembro';
+  }
+  
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+    if (typeof (window as any).showToast === 'function') {
+      (window as any).showToast({ message, type });
+    } else {
+      console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+  }
+  
+  function showMemberOptionsMenu(triggerElement: HTMLElement, options: any) {
+    if (typeof (window as any).showMemberOptionsMenu === 'function') {
+      (window as any).showMemberOptionsMenu(triggerElement, options);
+    } else {
+      console.warn('showMemberOptionsMenu no está disponible globalmente');
+    }
+  }
+  
+  // // EXPORTAR FUNCIONES PARA USO EXTERNO
+  (window as any).MemberManagement = {
+    loadWorkspaceMembers,
+    handleCancelInvitation,
+    setupMemberEventListeners
+  };
+  
+  // // INICIALIZACIÓN AUTOMÁTICA
+  if (workspaceId) {
+    loadWorkspaceMembers(workspaceId);
+  }
+</script>

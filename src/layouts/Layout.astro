@@ -1,6 +1,8 @@
 ---
 import '../styles/global.css'
-import Navbar from '../components/ui/Navbar.astro';
+// // NUEVO: Importar sistema de notificaciones Toast global
+import Toast from '../components/ui/Toast.astro'
+
 // Aceptamos 'title' como prop desde las páginas para definir el <title> del documento
 const { title = 'TaskFlow' } = Astro.props;
 ---
@@ -14,8 +16,10 @@ const { title = 'TaskFlow' } = Astro.props;
 		<title>{title}</title>
 	</head>
 	<body>
-		<Navbar />
 		<slot />
+		
+		<!-- // NUEVO: Sistema de notificaciones Toast disponible globalmente -->
+		<Toast />
 	</body>
 </html>
 
