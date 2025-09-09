@@ -1,3 +1,5 @@
+// src/scripts/sidebar-island.ts
+
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/auth';
 import { subscribeToUserWorkspaces } from '../firebase/api';
@@ -8,294 +10,177 @@ type Workspace = DomainWorkspace;
 let expandedWorkspaceId: string | null = null;
 let workspacesUnsubscribe: (() => void) | null = null;
 
+// --- NUEVA FUNCIÓN PRINCIPAL PARA NAVEGACIÓN DINÁMICA ---
+// Carga el contenido de una URL y lo inyecta en el contenedor principal del dashboard.
+async function loadContent(url: string, pushState = true) {
+  const contentContainer = document.getElementById('dashboard-content');
+  if (!contentContainer) {
+    // Si no se encuentra el contenedor, recurrir a la navegación completa como fallback.
+    window.location.href = url;
+    return;
+  }
+
+  // // 1. Muestra un estado de carga visual para el usuario.
+  contentContainer.style.opacity = '0.5';
+  contentContainer.style.transition = 'opacity 0.2s ease-in-out';
+
+  try {
+    // // 2. Realiza la petición para obtener el HTML de la página de destino.
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network response was not ok.');
+    const html = await response.text();
+
+    // // 3. Parsea el HTML recibido para poder buscar en su DOM.
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // // 4. Busca el contenedor de contenido en la página que hemos cargado.
+    const newContent = doc.getElementById('dashboard-content');
+
+    if (newContent) {
+      // // 5. Reemplaza el contenido antiguo con el nuevo.
+      contentContainer.innerHTML = newContent.innerHTML;
+
+      // // 6. Si es una nueva navegación (no un 'atrás'/'adelante'), actualiza la URL en el navegador.
+      if (pushState) {
+        history.pushState({ path: url }, '', url);
+      }
+    } else {
+      // Fallback si el nuevo contenido no tiene el contenedor esperado.
+      throw new Error("Contenedor '#dashboard-content' no encontrado en la página cargada.");
+    }
+  } catch (error) {
+    console.error('Error al cargar contenido dinámicamente, redirigiendo:', error);
+    window.location.href = url; // Redirección completa como fallback en caso de error.
+  } finally {
+    // // 7. Restaura la opacidad para mostrar el nuevo contenido.
+    contentContainer.style.opacity = '1';
+  }
+}
+
+
+// --- FUNCIÓN DE RENDERIZADO MODIFICADA ---
+// Ahora genera URLs reales en los atributos href.
 function renderWorkspaces(workspaces: Workspace[]) {
   const workspacesList = document.getElementById('workspaces-list');
   if (!workspacesList) return;
 
-  if (workspaces.length === 0) {
+  if (!workspaces || workspaces.length === 0) {
     workspacesList.innerHTML = `
       <div class="text-center py-4">
-        <div class="text-gray-400 mb-2">
-          <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-          </svg>
-        </div>
         <p class="text-sm text-gray-500 mb-3">No hay espacios de trabajo</p>
-        <button class="text-xs text-blue-600 hover:text-blue-800" onclick="document.getElementById('create-workspace-btn')?.click()">
-          Crear el primero
-        </button>
+        <button id="create-workspace-btn" class="text-xs text-blue-600 hover:text-blue-800">Crear el primero</button>
       </div>
     `;
     return;
   }
 
-  // // CAMBIO: renderizar cada workspace como un ítem de menú vertical compacto
-  // // Mantener acceso por teclado y roles ARIA: el toggle es un botón que expande/colapsa
-  const workspacesHTML = workspaces.map((workspace: Workspace) => {
-    const isExpanded = expandedWorkspaceId === workspace.id;
-    const memberCount = (workspace.members && workspace.members.length) || 0;
-    const boardCount = (workspace.boards && workspace.boards.length) || 0;
-
-    // // CAMBIO: generar exactamente el markup solicitado (menú tipo Trello)
-    return `
-      <div class="workspace-item" data-workspace-id="${workspace.id}">
-        <!-- header: ahora el header completo es el toggle para mejorar usabilidad -->
-        <div class="flex items-center justify-between workspace-toggle" data-workspace-id="${workspace.id}" aria-expanded="${isExpanded ? 'true' : 'false'}">
-          <div class="flex items-center space-x-2">
-            <div class="w-6 h-6 bg-pink-500 rounded flex items-center justify-center text-xs font-bold">${workspace.name?.split(' ').map((w:any)=>w[0]).join('').toUpperCase().slice(0,1) || ''}</div>
-            <span class="text-gray-900 text-sm">${workspace.name || 'Workspace'}</span>
+  const workspacesHTML = workspaces
+    .map((workspace: Workspace) => {
+      const isExpanded = expandedWorkspaceId === workspace.id;
+      const initials = workspace.name?.split(' ').map((w: any) => w[0]).join('').toUpperCase().slice(0, 2) || '';
+      
+      // // CAMBIO: Los href ahora apuntan a las URLs reales.
+      return `
+        <div class="workspace-item" data-workspace-id="${workspace.id}">
+          <div class="flex items-center justify-between workspace-toggle cursor-pointer" data-workspace-id="${workspace.id}" aria-expanded="${isExpanded ? 'true' : 'false'}">
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 bg-pink-500 rounded flex items-center justify-center text-xs font-bold">${initials}</div>
+              <span class="text-gray-900 text-sm">${workspace.name || 'Workspace'}</span>
+            </div>
+            <div class="text-gray-400 hover:text-white">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
           </div>
-          <div class="text-gray-400 hover:text-white">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-          </div>
-        </div>
 
-        
           <div class="workspace-menu ml-8 mt-1 space-y-1 ${isExpanded ? '' : 'hidden'}" id="menu-${workspace.id}">
-          <a href="#" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            <span>Tableros</span>
-          </a>
-          <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path></svg>
-            <span>Miembros</span>
-              <button class="text-gray-400 hover:text-white ml-auto"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg></button>
-          </a>
-          <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            <span>Configuración</span>
-          </a>
+            <a href="/workspace/${workspace.id}/boards" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+              <span>Tableros</span>
+            </a>
+            <a href="/dashboard-refactored?tab=members&workspaceId=${workspace.id}" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+              <span>Miembros</span>
+            </a>
+            <a href="/dashboard-refactored?tab=settings&workspaceId=${workspace.id}" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+              <span>Configuración</span>
+            </a>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    })
+    .join('');
 
-  // debug: cuantos workspaces vamos a renderizar
-  console.log('[sidebar-island] renderWorkspaces: rendering', workspaces.length, 'workspaces');
   workspacesList.innerHTML = workspacesHTML;
-
-  // Note: we rely on a single delegated handler attached to the container
-  // to avoid double-toggling when clicks bubble. Do NOT attach per-item
-  // listeners here.
 }
 
-function handleWorkspaceToggle(event: Event) {
-  const button = event.currentTarget as HTMLElement;
-  const workspaceId = button.dataset.workspaceId;
-  if (!workspaceId) return;
-
-  // // CAMBIO: buscar el menú generado (.workspace-menu) y la flecha dentro del toggle
-  const isCurrentlyExpanded = expandedWorkspaceId === workspaceId;
-  // debug: log toggle events y estado
-  console.log('[sidebar-island] toggle workspace:', workspaceId, 'currentlyExpanded:', isCurrentlyExpanded);
-  expandedWorkspaceId = isCurrentlyExpanded ? null : workspaceId;
-
-  document.querySelectorAll('.workspace-item').forEach(item => {
-    const itemEl = item as HTMLElement;
-    const itemWorkspaceId = itemEl.dataset.workspaceId;
-
-    // menu generado que contiene Tableros/Miembros/Configuración
-    const menu = itemEl.querySelector('.workspace-menu') as HTMLElement | null || document.getElementById(`menu-${itemWorkspaceId}`) as HTMLElement | null;
-    // flecha svg dentro del toggle
-    const arrow = itemEl.querySelector('.workspace-toggle svg');
-
-    if (itemWorkspaceId === workspaceId) {
-      if (isCurrentlyExpanded) {
-        menu?.classList.add('hidden');
-        arrow?.classList.remove('rotate-90');
-      } else {
-        menu?.classList.remove('hidden');
-        arrow?.classList.add('rotate-90');
-      }
-    } else {
-      menu?.classList.add('hidden');
-      arrow?.classList.remove('rotate-90');
-    }
-  });
-}
-
-// Helper para togglear por id (útil para delegación de eventos)
 function toggleWorkspaceById(workspaceId: string) {
   const isCurrentlyExpanded = expandedWorkspaceId === workspaceId;
-  console.log('[sidebar-island] toggleWorkspaceById:', workspaceId, 'currentlyExpanded:', isCurrentlyExpanded);
   expandedWorkspaceId = isCurrentlyExpanded ? null : workspaceId;
 
-  document.querySelectorAll('.workspace-item').forEach(item => {
+  document.querySelectorAll('.workspace-item').forEach((item) => {
     const itemEl = item as HTMLElement;
     const itemWorkspaceId = itemEl.dataset.workspaceId;
-
-    const menu = itemEl.querySelector('.workspace-menu') as HTMLElement | null || document.getElementById(`menu-${itemWorkspaceId}`) as HTMLElement | null;
+    const menu = itemEl.querySelector('.workspace-menu') as HTMLElement | null;
     const arrow = itemEl.querySelector('.workspace-toggle svg');
 
-    if (itemWorkspaceId === workspaceId) {
-      if (isCurrentlyExpanded) {
-        menu?.classList.add('hidden');
-        arrow?.classList.remove('rotate-90');
-      } else {
+    if (itemWorkspaceId === workspaceId && !isCurrentlyExpanded) {
         menu?.classList.remove('hidden');
         arrow?.classList.add('rotate-90');
-      }
     } else {
-      menu?.classList.add('hidden');
-      arrow?.classList.remove('rotate-90');
+        menu?.classList.add('hidden');
+        arrow?.classList.remove('rotate-90');
     }
   });
 }
 
 function handleCreateWorkspace() {
-  const event = new CustomEvent('create-workspace-requested');
-  document.dispatchEvent(event);
+  document.dispatchEvent(new CustomEvent('create-workspace-requested'));
 }
 
+// --- FUNCIÓN DE INICIALIZACIÓN REFACTORIZADA ---
 function initializeSidebarIsland() {
-  const createBtn = document.getElementById('create-workspace-btn');
-  if (createBtn) createBtn.addEventListener('click', handleCreateWorkspace);
-
-  // Delegated handler: clicks inside #workspaces-list toggle the workspace
   const workspacesListEl = document.getElementById('workspaces-list');
   if (workspacesListEl) {
-    // remove existing to avoid duplicate listeners
-    (workspacesListEl as any)._delegateAttached && workspacesListEl.removeEventListener('click', (workspacesListEl as any)._delegateFn);
-  const delegateFn = async (e: Event) => {
+    // Usamos delegación de eventos para manejar todos los clics eficientemente.
+    const delegateFn = async (e: Event) => {
       const target = e.target as HTMLElement;
 
-      // 1) If click is on a workspace action link (data-action), handle navigation
-      const actionEl = target.closest('[data-action]') as HTMLElement | null;
-      if (actionEl) {
-        e.preventDefault();
-        const action = actionEl.dataset.action;
-        const wid = actionEl.dataset.workspaceId;
-        if (!action || !wid) return;
-
-        // // Emitir un evento para que cualquier controlador del dashboard pueda interceptarlo
-        // // Esto permite que, incluso si la API global no está expuesta todavía, el dashboard
-        // // escuche y muestre la vista deseada sin recargar la página.
-        try {
-          document.dispatchEvent(new CustomEvent('sidebar-action', { detail: { action, workspaceId: wid } }));
-        } catch (err) {
-          // // no fatal
-          console.warn('[sidebar-island] could not dispatch sidebar-action event', err);
-        }
-
-        const dashboard = (window as any).dashboardIslands;
-
-  // Prefer SPA navigation via dashboard islands if available
-  if (dashboard && typeof dashboard.navigateToWorkspace === 'function') {
-          // navigateToWorkspace returns a Promise in the dashboard implementation
-          try {
-            // call SPA navigate and then request the correct tab when necessary
-            (dashboard.navigateToWorkspace as Function)(wid).then(() => {
-              // // Si la API SPA expone switchWorkspaceTab, usarla para cambiar pestañas
-              if (action === 'members' && typeof dashboard.switchWorkspaceTab === 'function') {
-                dashboard.switchWorkspaceTab('members');
-                return;
-              }
-
-              if (action === 'boards' && typeof dashboard.switchWorkspaceTab === 'function') {
-                dashboard.switchWorkspaceTab('boards');
-                return;
-              }
-
-              if (action === 'config') {
-                // // Si no hay pestaña de config implementada, mostrar mensaje amistoso
-                if (typeof dashboard.showToast === 'function') dashboard.showToast('Configuración en desarrollo', 'info');
-                else console.log('[sidebar-island] config clicked for', wid);
-                return;
-              }
-            }).catch((err: any) => {
-              console.error('[sidebar-island] dashboard.navigateToWorkspace failed, falling back to internal handlers', err);
-              // // FALLBACK: intentar usar funciones públicas existentes sin recargar la página
-              // // 1) Si existe showBoardsView (BoardOverview), llamarla y activar pestaña si es necesario
-              const showBoardsView = (window as any).showBoardsView;
-              if (typeof showBoardsView === 'function') {
-                // // Mostrar la vista de tableros para el workspace
-                try { showBoardsView(wid); } catch (e) { console.error(e); }
-                if (action === 'members') {
-                  // // Activar la pestaña miembros dentro del main
-                  setTimeout(() => { document.getElementById('members-tab')?.click(); }, 150);
-                }
-                if (action === 'config') {
-                  setTimeout(() => { document.getElementById('config-tab')?.click(); }, 150);
-                }
-                return;
-              }
-
-              // // Último recurso: navegación completa a rutas existentes
-              if (action === 'boards') window.location.href = `/workspace/${wid}/boards`;
-              else if (action === 'members') window.location.href = `/workspace/${wid}/boards`;
-              else if (action === 'config') window.location.href = `/workspace/${wid}/settings`;
-            });
-          } catch (err) {
-            console.error('[sidebar-island] error calling dashboard API:', err);
-          }
-
-        } else {
-          // // No SPA API available right now: intentar handlers internos antes de hacer full navigation
-          // // Puede ocurrir que showBoardsView todavía no haya sido expuesto por el otro script;
-          // // Intentamos reintentar por un corto periodo antes de hacer fallback a navegación completa.
-          const waitFor = (predicate: () => any, timeout = 1500, interval = 50) => new Promise((resolve, reject) => {
-            const started = Date.now();
-            const iv = setInterval(() => {
-              try {
-                const res = predicate();
-                if (res) {
-                  clearInterval(iv);
-                  resolve(res);
-                } else if (Date.now() - started > timeout) {
-                  clearInterval(iv);
-                  reject(new Error('timeout'));
-                }
-              } catch (err) {
-                clearInterval(iv);
-                reject(err);
-              }
-            }, interval);
-          });
-
-          try {
-            // // esperar brevemente a que showBoardsView esté disponible
-            await waitFor(() => (window as any).showBoardsView, 600, 50) as any;
-            const showBoardsView = (window as any).showBoardsView;
-            if (typeof showBoardsView === 'function') {
-              try { showBoardsView(wid); } catch (e) { console.error(e); }
-              if (action === 'members') setTimeout(() => { document.getElementById('members-tab')?.click(); }, 150);
-              if (action === 'config') setTimeout(() => { document.getElementById('config-tab')?.click(); }, 150);
-              return;
-            }
-          } catch (err) {
-            // // timed out or error — no showBoardsView, proceder a fallback completo
-            console.warn('[sidebar-island] showBoardsView not available after wait, falling back', err);
-          }
-
-          // // Último recurso: navegación completa
-          if (action === 'boards') window.location.href = `/workspace/${wid}/boards`;
-          else if (action === 'members') window.location.href = `/workspace/${wid}/boards`;
-          else if (action === 'config') window.location.href = `/workspace/${wid}/settings`;
-        }
-
+      // 1) Manejar clics en los enlaces de navegación (Tableros, Miembros, etc.)
+      const actionLink = target.closest('a[data-action]') as HTMLAnchorElement | null;
+      if (actionLink) {
+        e.preventDefault(); // Prevenir la navegación de página completa.
+        await loadContent(actionLink.href); // Cargar el contenido dinámicamente.
         return;
       }
 
-      // 2) only toggle when the click is on the header (.workspace-toggle) or one of its children
-      const toggleEl = target.closest('.workspace-toggle') as HTMLElement | null;
-      if (!toggleEl) return;
-      const id = toggleEl.dataset.workspaceId;
-      if (!id) return;
-      // use helper to toggle
-      toggleWorkspaceById(id);
+      // 2) Manejar clics para expandir/colapsar un workspace.
+      const toggleEl = target.closest('.workspace-toggle');
+      if (toggleEl) {
+        const id = (toggleEl as HTMLElement).dataset.workspaceId;
+        if (id) toggleWorkspaceById(id);
+        return;
+      }
+      
+      // 3) Manejar clic en "Crear el primero"
+      const createBtn = target.closest('#create-workspace-btn');
+      if(createBtn) {
+        handleCreateWorkspace();
+      }
     };
+
+    // Limpiar listeners antiguos si los hubiera para evitar duplicados en HMR.
+    if ((workspacesListEl as any)._delegateFn) {
+      workspacesListEl.removeEventListener('click', (workspacesListEl as any)._delegateFn);
+    }
+    
     workspacesListEl.addEventListener('click', delegateFn);
-    (workspacesListEl as any)._delegateAttached = true;
-    (workspacesListEl as any)._delegateFn = delegateFn;
+    (workspacesListEl as any)._delegateFn = delegateFn; // Guardar referencia para poder limpiar.
   }
 
-  // subscribe to auth changes and user workspace updates
+  // Suscripción a los datos de Firebase (sin cambios aquí).
   onAuthStateChanged(auth, (user) => {
     const workspacesList = document.getElementById('workspaces-list');
     if (user) {
-      if (workspacesUnsubscribe) {
-        workspacesUnsubscribe();
-      }
+      if (workspacesUnsubscribe) workspacesUnsubscribe();
       workspacesUnsubscribe = subscribeToUserWorkspaces(user.uid, (workspaces: Workspace[]) => {
         renderWorkspaces(workspaces);
       });
@@ -305,8 +190,22 @@ function initializeSidebarIsland() {
         workspacesUnsubscribe = null;
       }
       if (workspacesList) {
-        workspacesList.innerHTML = `\n          <div class="text-center py-4">\n            <p class="text-sm text-gray-500">Inicia sesión para ver tus workspaces</p>\n          </div>\n        `;
+        workspacesList.innerHTML = `
+          <div class="text-center py-4">
+            <p class="text-sm text-gray-500">Inicia sesión para ver tus workspaces</p>
+          </div>
+        `;
       }
+    }
+  });
+  
+  // // NUEVO: Listener para los botones de atrás/adelante del navegador.
+  window.addEventListener('popstate', (event) => {
+    if (event.state && event.state.path) {
+      loadContent(event.state.path, false); // Carga el contenido sin crear una nueva entrada en el historial.
+    } else if (location.pathname.startsWith('/workspace/')) {
+      // Fallback para casos donde el state no esté seteado
+      loadContent(location.href, false)
     }
   });
 }
@@ -316,9 +215,11 @@ function cleanupSidebarIsland() {
     workspacesUnsubscribe();
     workspacesUnsubscribe = null;
   }
+  // No es necesario limpiar el listener de popstate generalmente.
 }
 
 export default function initSidebarIsland() {
+  // Lógica de inicialización (sin cambios).
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeSidebarIsland);
   } else {
@@ -330,6 +231,6 @@ export default function initSidebarIsland() {
   (window as any).sidebarIsland = {
     renderWorkspaces,
     expandedWorkspaceId: () => expandedWorkspaceId,
-    cleanup: cleanupSidebarIsland
+    cleanup: cleanupSidebarIsland,
   };
 }

@@ -20,6 +20,8 @@ function showBoardsView(workspaceId: string) {
   loadWorkspaceDetails(workspaceId);
   loadWorkspaceBoards(workspaceId);
   showTab('boards');
+  // confirm to sidebar that the action was handled in-page
+  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action: 'boards', workspaceId } })); } catch (e) { /* ignore */ }
 }
 
 function showWorkspacesView() {

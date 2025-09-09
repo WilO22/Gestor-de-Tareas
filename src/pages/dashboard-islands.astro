@@ -224,6 +224,9 @@ import MembersManagementIsland from "../components/dashboard/MembersManagementIs
 
         dashboardState.loading = false;
 
+  // notify sidebar that navigation finished successfully
+  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action: 'boards', workspaceId } })); } catch (e) { /* ignore */ }
+
       } catch (error) {
         console.error('❌ Dashboard: Error navegando a workspace:', error);
         showToast('Error al cargar el workspace', 'error');

@@ -28,7 +28,9 @@ const { title = "Dashboard" } = Astro.props;
       <Sidebar />
 
       <main class="flex-1 p-8 bg-gray-50">
-        <div class="max-w-4xl">
+        // Contenedor principal para el contenido dinámico del dashboard.
+        // Le añadimos un ID para poder seleccionarlo fácilmente desde el script del cliente.
+        <div id="dashboard-content" class="max-w-4xl">
           <slot />
         </div>
       </main>

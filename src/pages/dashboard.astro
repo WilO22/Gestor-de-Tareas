@@ -80,6 +80,48 @@ import Toast from '../components/ui/Toast.astro';
 
   (window as any).showCreateWorkspaceModal = showCreateWorkspaceModal;
   (window as any).showCreateBoardModal = showCreateBoardModal;
+
+  // Listen for Sidebar actions dispatched by the Sidebar island. This centralizes
+  // routing so the dashboard can render boards/members/config in-place (SPA)
+  // and only falls back to full navigation when necessary.
+  document.addEventListener('sidebar-action', async (ev) => {
+    const detail = (ev as unknown as CustomEvent)?.detail || {};
+    const { action, workspaceId } = detail as { action?: string; workspaceId?: string };
+    if (!workspaceId) return;
+
+    // Prefer dashboard-islands API (if present) which some variants expose
+    try {
+      const d = (window as any).dashboardIslands;
+      if (d?.navigateToWorkspace) {
+        await d.navigateToWorkspace(workspaceId);
+        // If the dashboardIslands object exposes a helper to switch tabs, call it.
+        if (action === 'members' && typeof d.switchToMembers === 'function') {
+          d.switchToMembers();
+        }
+  // Notify sidebar that the action was handled in-page
+  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action, workspaceId } })); } catch (e) { /* ignore */ }
+        return;
+      }
+    } catch (err) {
+      // ignore and try other fallbacks
+    }
+
+    // Next prefer the BoardOverview SPA API which exposes showBoardsView(workspaceId)
+    if (action === 'boards' && typeof (window as any).showBoardsView === 'function') {
+      (window as any).showBoardsView(workspaceId);
+  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action, workspaceId } })); } catch (e) { /* ignore */ }
+      return;
+    }
+
+    // Last resort: fallback to full-page navigation
+    if (action === 'boards') {
+      window.location.href = `/workspace/${workspaceId}/boards`;
+    } else if (action === 'members') {
+      window.location.href = `/workspace/${workspaceId}/members`;
+    } else if (action === 'config') {
+      window.location.href = `/workspace/${workspaceId}/settings`;
+    }
+  });
 </script>
 
 <style>
