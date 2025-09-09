@@ -156,7 +156,7 @@ function initializeSidebarIsland() {
   if (workspacesListEl) {
     // remove existing to avoid duplicate listeners
     (workspacesListEl as any)._delegateAttached && workspacesListEl.removeEventListener('click', (workspacesListEl as any)._delegateFn);
-    const delegateFn = (e: Event) => {
+  const delegateFn = async (e: Event) => {
       const target = e.target as HTMLElement;
 
       // 1) If click is on a workspace action link (data-action), handle navigation
@@ -166,6 +166,16 @@ function initializeSidebarIsland() {
         const action = actionEl.dataset.action;
         const wid = actionEl.dataset.workspaceId;
         if (!action || !wid) return;
+
+        // // Emitir un evento para que cualquier controlador del dashboard pueda interceptarlo
+        // // Esto permite que, incluso si la API global no está expuesta todavía, el dashboard
+        // // escuche y muestre la vista deseada sin recargar la página.
+        try {
+          document.dispatchEvent(new CustomEvent('sidebar-action', { detail: { action, workspaceId: wid } }));
+        } catch (err) {
+          // // no fatal
+          console.warn('[sidebar-island] could not dispatch sidebar-action event', err);
+        }
 
         const dashboard = (window as any).dashboardIslands;
 
@@ -220,15 +230,41 @@ function initializeSidebarIsland() {
           }
 
         } else {
-          // // No SPA API available: intentar handlers internos antes de hacer full navigation
-          // // 1) Usar showBoardsView si está disponible (evita recarga completa)
-          const showBoardsView = (window as any).showBoardsView;
-          if (typeof showBoardsView === 'function') {
-            // // Mostrar la vista de tableros y activar la pestaña correspondiente
-            try { showBoardsView(wid); } catch (e) { console.error(e); }
-            if (action === 'members') setTimeout(() => { document.getElementById('members-tab')?.click(); }, 150);
-            if (action === 'config') setTimeout(() => { document.getElementById('config-tab')?.click(); }, 150);
-            return;
+          // // No SPA API available right now: intentar handlers internos antes de hacer full navigation
+          // // Puede ocurrir que showBoardsView todavía no haya sido expuesto por el otro script;
+          // // Intentamos reintentar por un corto periodo antes de hacer fallback a navegación completa.
+          const waitFor = (predicate: () => any, timeout = 1500, interval = 50) => new Promise((resolve, reject) => {
+            const started = Date.now();
+            const iv = setInterval(() => {
+              try {
+                const res = predicate();
+                if (res) {
+                  clearInterval(iv);
+                  resolve(res);
+                } else if (Date.now() - started > timeout) {
+                  clearInterval(iv);
+                  reject(new Error('timeout'));
+                }
+              } catch (err) {
+                clearInterval(iv);
+                reject(err);
+              }
+            }, interval);
+          });
+
+          try {
+            // // esperar brevemente a que showBoardsView esté disponible
+            await waitFor(() => (window as any).showBoardsView, 600, 50) as any;
+            const showBoardsView = (window as any).showBoardsView;
+            if (typeof showBoardsView === 'function') {
+              try { showBoardsView(wid); } catch (e) { console.error(e); }
+              if (action === 'members') setTimeout(() => { document.getElementById('members-tab')?.click(); }, 150);
+              if (action === 'config') setTimeout(() => { document.getElementById('config-tab')?.click(); }, 150);
+              return;
+            }
+          } catch (err) {
+            // // timed out or error — no showBoardsView, proceder a fallback completo
+            console.warn('[sidebar-island] showBoardsView not available after wait, falling back', err);
           }
 
           // // Último recurso: navegación completa

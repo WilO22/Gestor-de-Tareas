@@ -171,6 +171,36 @@ import Toast from '../components/ui/Toast.astro';
     });
     
     console.log('✅ Event listeners configurados');
+    // // Escuchar eventos emitidos por el Sidebar Island para acciones (Tableros/Miembros/Config)
+    document.addEventListener('sidebar-action', (ev: any) => {
+      // // ev.detail: { action, workspaceId }
+      const { action, workspaceId } = ev.detail || {};
+      if (!action || !workspaceId) return;
+
+      // // Si existe la API showBoardsView, usarla para mostrar tableros dentro del dashboard
+      if (typeof (window as any).showBoardsView === 'function') {
+        try {
+          (window as any).showBoardsView(workspaceId);
+          // // Si la acción es 'members' activar la pestaña miembros
+          if (action === 'members') setTimeout(() => document.getElementById('members-tab')?.click(), 120);
+          if (action === 'config') setTimeout(() => document.getElementById('config-tab')?.click(), 120);
+        } catch (err) {
+          console.error('Error handling sidebar-action via showBoardsView', err);
+        }
+        return;
+      }
+
+      // // Si no existe showBoardsView, intentar delegar a dashboardIslands si está disponible
+      const dashboard = (window as any).dashboardIslands;
+      if (dashboard && typeof dashboard.navigateToWorkspace === 'function') {
+        try { dashboard.navigateToWorkspace(workspaceId).then(() => { if (action === 'members') dashboard.switchWorkspaceTab('members'); if (action === 'boards') dashboard.switchWorkspaceTab('boards'); }); } catch (e) { console.error(e); }
+        return;
+      }
+
+      // // último recurso: navegar a la ruta de tableros en la página completa
+      if (action === 'boards' || action === 'members') window.location.href = `/workspace/${workspaceId}/boards`;
+      if (action === 'config') window.location.href = `/workspace/${workspaceId}/settings`;
+    });
   }
   
   // // FUNCIÓN: Cargar workspaces del usuario
