@@ -269,6 +269,43 @@ try {
 
     // Actualizar el grid
     elements.grid.innerHTML = workspacesHTML;
+
+    // // Evitar navegación completa al hacer click en la tarjeta del workspace.
+    // // Comportamiento deseado: renderizar los tableros dentro del main del dashboard
+    // // Reutilizamos la API pública existente `showBoardsView` si está disponible.
+    try {
+      if (elements.grid) {
+        elements.grid.querySelectorAll('.workspace-card-container a').forEach(a => {
+          // // remover listeners previos si existen
+          (a as any)._wsClickAttached && a.removeEventListener('click', (a as any)._wsClickFn);
+          const fn = (e: Event) => {
+            e.preventDefault(); // // prevenir navegación por href
+            e.stopPropagation();
+            const container = (a as HTMLElement).closest('.workspace-card-container') as HTMLElement | null;
+            const wid = container?.dataset.workspaceId;
+            if (!wid) {
+              // // fallback: seguir el href original
+              window.location.href = (a as HTMLAnchorElement).href;
+              return;
+            }
+
+            const showBoardsView = (window as any).showBoardsView;
+            if (typeof showBoardsView === 'function') {
+              // // Llamada SPA para renderizar tableros en el main
+              try { showBoardsView(wid); } catch (err) { console.error('Error calling showBoardsView', err); window.location.href = `/workspace/${wid}/boards`; }
+            } else {
+              // // Si no existe la API SPA, navegar a la ruta de tableros
+              window.location.href = `/workspace/${wid}/boards`;
+            }
+          };
+          a.addEventListener('click', fn);
+          (a as any)._wsClickAttached = true;
+          (a as any)._wsClickFn = fn;
+        });
+      }
+    } catch (e) {
+      console.error('WorkspacesViewIsland: error attaching SPA click handlers', e);
+    }
   }
 
   // Función para ocultar todos los estados
