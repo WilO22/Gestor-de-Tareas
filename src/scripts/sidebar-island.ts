@@ -4,60 +4,12 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/auth';
 import { subscribeToUserWorkspaces } from '../firebase/api';
 import type { Workspace as DomainWorkspace } from '../types/domain';
+import { showBoards, showWorkspaces } from '../store'; // <-- IMPORTANTE: Importar acciones del store
 
 type Workspace = DomainWorkspace;
 
 let expandedWorkspaceId: string | null = null;
 let workspacesUnsubscribe: (() => void) | null = null;
-
-// --- NUEVA FUNCIÓN PRINCIPAL PARA NAVEGACIÓN DINÁMICA ---
-// Carga el contenido de una URL y lo inyecta en el contenedor principal del dashboard.
-async function loadContent(url: string, pushState = true) {
-  const contentContainer = document.getElementById('dashboard-content');
-  if (!contentContainer) {
-    // Si no se encuentra el contenedor, recurrir a la navegación completa como fallback.
-    window.location.href = url;
-    return;
-  }
-
-  // // 1. Muestra un estado de carga visual para el usuario.
-  contentContainer.style.opacity = '0.5';
-  contentContainer.style.transition = 'opacity 0.2s ease-in-out';
-
-  try {
-    // // 2. Realiza la petición para obtener el HTML de la página de destino.
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network response was not ok.');
-    const html = await response.text();
-
-    // // 3. Parsea el HTML recibido para poder buscar en su DOM.
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    // // 4. Busca el contenedor de contenido en la página que hemos cargado.
-    const newContent = doc.getElementById('dashboard-content');
-
-    if (newContent) {
-      // // 5. Reemplaza el contenido antiguo con el nuevo.
-      contentContainer.innerHTML = newContent.innerHTML;
-
-      // // 6. Si es una nueva navegación (no un 'atrás'/'adelante'), actualiza la URL en el navegador.
-      if (pushState) {
-        history.pushState({ path: url }, '', url);
-      }
-    } else {
-      // Fallback si el nuevo contenido no tiene el contenedor esperado.
-      throw new Error("Contenedor '#dashboard-content' no encontrado en la página cargada.");
-    }
-  } catch (error) {
-    console.error('Error al cargar contenido dinámicamente, redirigiendo:', error);
-    window.location.href = url; // Redirección completa como fallback en caso de error.
-  } finally {
-    // // 7. Restaura la opacidad para mostrar el nuevo contenido.
-    contentContainer.style.opacity = '1';
-  }
-}
-
 
 // --- FUNCIÓN DE RENDERIZADO MODIFICADA ---
 // Ahora genera URLs reales en los atributos href.
@@ -80,7 +32,6 @@ function renderWorkspaces(workspaces: Workspace[]) {
       const isExpanded = expandedWorkspaceId === workspace.id;
       const initials = workspace.name?.split(' ').map((w: any) => w[0]).join('').toUpperCase().slice(0, 2) || '';
       
-      // // CAMBIO: Los href ahora apuntan a las URLs reales.
       return `
         <div class="workspace-item" data-workspace-id="${workspace.id}">
           <div class="flex items-center justify-between workspace-toggle cursor-pointer" data-workspace-id="${workspace.id}" aria-expanded="${isExpanded ? 'true' : 'false'}">
@@ -94,13 +45,13 @@ function renderWorkspaces(workspaces: Workspace[]) {
           </div>
 
           <div class="workspace-menu ml-8 mt-1 space-y-1 ${isExpanded ? '' : 'hidden'}" id="menu-${workspace.id}">
-            <a href="/workspace/${workspace.id}/boards" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+            <a href="#" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors boards-btn">
               <span>Tableros</span>
             </a>
-            <a href="/dashboard-refactored?tab=members&workspaceId=${workspace.id}" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+            <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
               <span>Miembros</span>
             </a>
-            <a href="/dashboard-refactored?tab=settings&workspaceId=${workspace.id}" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+            <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
               <span>Configuración</span>
             </a>
           </div>
@@ -143,12 +94,18 @@ function initializeSidebarIsland() {
     // Usamos delegación de eventos para manejar todos los clics eficientemente.
     const delegateFn = async (e: Event) => {
       const target = e.target as HTMLElement;
+      e.preventDefault(); // Prevenir navegación en todos los clics delegados
 
       // 1) Manejar clics en los enlaces de navegación (Tableros, Miembros, etc.)
       const actionLink = target.closest('a[data-action]') as HTMLAnchorElement | null;
       if (actionLink) {
-        e.preventDefault(); // Prevenir la navegación de página completa.
-        await loadContent(actionLink.href); // Cargar el contenido dinámicamente.
+        const workspaceId = actionLink.dataset.workspaceId;
+        const action = actionLink.dataset.action;
+        
+        if (workspaceId && action === 'boards') {
+          showBoards(workspaceId); // <-- AHORA: Llamada al store
+        }
+        // Aquí se podrían manejar otras acciones como 'members' o 'config'
         return;
       }
 
@@ -199,15 +156,6 @@ function initializeSidebarIsland() {
     }
   });
   
-  // // NUEVO: Listener para los botones de atrás/adelante del navegador.
-  window.addEventListener('popstate', (event) => {
-    if (event.state && event.state.path) {
-      loadContent(event.state.path, false); // Carga el contenido sin crear una nueva entrada en el historial.
-    } else if (location.pathname.startsWith('/workspace/')) {
-      // Fallback para casos donde el state no esté seteado
-      loadContent(location.href, false)
-    }
-  });
 }
 
 function cleanupSidebarIsland() {
@@ -215,7 +163,6 @@ function cleanupSidebarIsland() {
     workspacesUnsubscribe();
     workspacesUnsubscribe = null;
   }
-  // No es necesario limpiar el listener de popstate generalmente.
 }
 
 export default function initSidebarIsland() {

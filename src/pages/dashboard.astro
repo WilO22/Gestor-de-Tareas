@@ -1,150 +1,98 @@
-﻿---
-import Layout from '../layouts/Layout.astro';
-import DashBoardHeader from '../components/dashboard/DashBoardHeader.astro';
-import SidebarIsland from '../components/dashboard/SidebarIsland.astro';
-import WorkspaceGrid from '../components/dashboard/WorkspaceGrid.astro';
-import BoardOverview from '../components/dashboard/BoardOverview.astro';
-import MemberManagement from '../components/dashboard/MemberManagement.astro';
-void MemberManagement;
-import MemberOptionsModal from '../components/ui/MemberOptionsModal.astro';
+--- 
+// src/pages/dashboard.astro
+import Layout from "../layouts/Layout.astro";
+import DashboardHeader from "../components/dashboard/DashBoardHeader.astro";
+import Sidebar from "../components/dashboard/Sidebar.astro";
+import DashboardContainer from '../components/dashboard/DashboardContainer.astro';
 import Toast from '../components/ui/Toast.astro';
 ---
-
-<Layout title="Dashboard - TaskFlow">
-  <DashBoardHeader />
-  
-  <div class="flex h-screen bg-gray-100">
-  <SidebarIsland client:load />
-    
-    <main class="flex-1 overflow-auto p-6">
-      <div id="loading-screen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
-        <div class="text-center">
-          <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-          <p class="mt-4 text-gray-600">Cargando dashboard...</p>
-        </div>
-      </div>
-      
-      <div id="app-container" class="hidden">
-        <div id="workspaces-view" class="space-y-6">
-          <div class="flex items-center justify-between">
-            <h1 class="text-3xl font-bold text-gray-900">Mis Espacios de Trabajo</h1>
-          </div>
-          
-          <WorkspaceGrid />
-        </div>
-        
-        <BoardOverview />
-      </div>
-    </main>
+<Layout title="Dashboard">
+  <div id="loading-screen" class="h-screen flex items-center justify-center fixed inset-0 bg-white z-50">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <p class="mt-4 text-gray-600">Cargando dashboard...</p>
+    </div>
   </div>
-  
-  <MemberOptionsModal />
+
+  <div id="app-container" class="hidden h-screen">
+    <DashboardHeader />
+    <div class="flex h-screen">
+      <Sidebar />
+      <DashboardContainer client:load /> 
+    </div>
+  </div>
   <Toast />
 </Layout>
 
 <script>
-  // Keep non-duplicating imports and utilities. The islands manage workspace subscriptions/rendering.
-  import { auth } from '../firebase/auth';
-  import { onAuthStateChanged } from 'firebase/auth';
-  import '../scripts/member-management';
+    import { onAuthStateChanged } from "firebase/auth";
+    import { auth } from "../firebase/auth";
+    import { fetchWorkspaces } from '../firebase/api';
+    import type { Workspace } from '../types/domain';
+    import { showBoards } from '../store';
+    import '../scripts/boards-view.ts';
 
-  const loadingScreen = document.getElementById('loading-screen');
-  const appContainer = document.getElementById('app-container');
+    const loadingScreen = document.getElementById('loading-screen');
+    const appContainer = document.getElementById('app-container');
 
-  function hideLoading() {
-    loadingScreen?.classList.add('hidden');
-    appContainer?.classList.remove('hidden');
-  }
-
-  // Only handle authentication state for showing the main UI. Do NOT re-subscribe to workspaces here
-  // — islands (Sidebar, WorkspacesView) perform their own subscriptions.
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      hideLoading();
-      // broadcast authenticated user so islands/controllers can pick it up if needed
-      document.dispatchEvent(new CustomEvent('user-authenticated', { detail: { uid: user.uid, email: user.email } }));
-    } else {
-      window.location.href = '/login';
+    function hideLoading() {
+      loadingScreen?.classList.add('hidden');
+      appContainer?.classList.remove('hidden');
     }
-  });
 
-  // Expose simple helpers that do not re-subscribe to workspaces.
-  function showCreateWorkspaceModal() {
-    // Forward as an event - islands or a controller can handle it centrally
-    document.dispatchEvent(new CustomEvent('create-workspace-requested'));
-  }
+    function renderWorkspaceCard(workspace: Workspace) {
+        const workspaceCard = document.createElement('div');
+        workspaceCard.className = 'bg-white rounded-lg shadow p-4 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-shadow';
+        workspaceCard.innerHTML = `
+            <div>
+                <h3 class="font-bold text-lg">${workspace.name}</h3>
+                <p class="text-sm text-gray-600">${workspace.description || ''}</p>
+            </div>
+            <div class="text-right mt-4">
+                <span class="text-xs text-gray-500">${workspace.memberCount || 0} miembros</span>
+            </div>
+        `;
+        workspaceCard.addEventListener('click', () => {
+            showBoards(workspace.id);
+        });
+        return workspaceCard;
+    }
 
-  function showCreateBoardModal() {
-    document.dispatchEvent(new CustomEvent('create-board-requested'));
-  }
+    async function fetchAndRenderWorkspaces(userId: string) {
+        const workspacesGrid = document.getElementById('workspaces-grid');
+        const loadingMessage = document.getElementById('loading-message');
+        if (!workspacesGrid || !loadingMessage) return;
 
-  (window as any).showCreateWorkspaceModal = showCreateWorkspaceModal;
-  (window as any).showCreateBoardModal = showCreateBoardModal;
+        try {
+            const workspaces = await fetchWorkspaces(userId);
+            if(loadingMessage) loadingMessage.style.display = 'none';
+            if(workspacesGrid) workspacesGrid.innerHTML = ''; // Limpiar antes de renderizar
 
-  // Listen for Sidebar actions dispatched by the Sidebar island. This centralizes
-  // routing so the dashboard can render boards/members/config in-place (SPA)
-  // and only falls back to full navigation when necessary.
-  document.addEventListener('sidebar-action', async (ev) => {
-    const detail = (ev as unknown as CustomEvent)?.detail || {};
-    const { action, workspaceId } = detail as { action?: string; workspaceId?: string };
-    if (!workspaceId) return;
+            if (workspaces.length === 0) {
+                if(workspacesGrid) workspacesGrid.innerHTML = '<p class="col-span-full text-center">No se encontraron espacios de trabajo.</p>';
+                return;
+            }
 
-    // Prefer dashboard-islands API (if present) which some variants expose
-    try {
-      const d = (window as any).dashboardIslands;
-      if (d?.navigateToWorkspace) {
-        await d.navigateToWorkspace(workspaceId);
-        // If the dashboardIslands object exposes a helper to switch tabs, call it.
-        if (action === 'members' && typeof d.switchToMembers === 'function') {
-          d.switchToMembers();
+            workspaces.forEach((workspace) => {
+                const card = renderWorkspaceCard(workspace);
+                workspacesGrid.appendChild(card);
+            });
+        } catch (error) {
+            console.error("Error fetching workspaces:", error);
+            if(loadingMessage) loadingMessage.textContent = 'Error al cargar los espacios de trabajo.';
         }
-  // Notify sidebar that the action was handled in-page
-  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action, workspaceId } })); } catch (e) { /* ignore */ }
-        return;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        hideLoading();
+        // La isla DashboardContainer se renderizará y mostrará la vista de workspaces por defecto.
+        // El script de la vista de workspaces se encargará de popularse a sí mismo.
+        // Sin embargo, la lógica original requería que esta página cargara los datos iniciales.
+        // La mantenemos para asegurar que la vista inicial de workspaces funcione.
+        await fetchAndRenderWorkspaces(user.uid);
+      } else {
+        window.location.href = '/login';
       }
-    } catch (err) {
-      // ignore and try other fallbacks
-    }
-
-    // Next prefer the BoardOverview SPA API which exposes showBoardsView(workspaceId)
-    if (action === 'boards' && typeof (window as any).showBoardsView === 'function') {
-      (window as any).showBoardsView(workspaceId);
-  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action, workspaceId } })); } catch (e) { /* ignore */ }
-      return;
-    }
-
-    // Last resort: fallback to full-page navigation
-    if (action === 'boards') {
-      window.location.href = `/workspace/${workspaceId}/boards`;
-    } else if (action === 'members') {
-      window.location.href = `/workspace/${workspaceId}/members`;
-    } else if (action === 'config') {
-      window.location.href = `/workspace/${workspaceId}/settings`;
-    }
-  });
+    });
 </script>
-
-<style>
-  .tab-btn {
-    transition: all 0.2s ease-in-out;
-  }
-  
-  .tab-btn:hover {
-    color: #374151;
-  }
-  
-  .tab-content {
-    animation: fadeIn 0.3s ease-in-out;
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-</style>

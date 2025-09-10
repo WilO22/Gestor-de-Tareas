@@ -1,0 +1,16 @@
+---
+// src/components/dashboard/BoardsView.astro
+export interface Props {
+  workspaceId: string;
+}
+const { workspaceId } = Astro.props;
+---
+<div>
+  <div class="flex items-center space-x-4 mb-8">
+     </div>
+  <div id="boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div id="boards-loading" class="col-span-full text-center text-gray-500">
+      Cargando tableros...
+    </div>
+  </div>
+</div>
