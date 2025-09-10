@@ -1,41 +1,30 @@
---- 
+---
 // src/components/dashboard/DashboardContainer.astro
+import { useStore } from 'nanostores/astro'; // <-- ESTA ES LA LÍNEA CRÍTICA Y CORRECTA
+import { dashboardView } from '../../store';
+
 import WorkspacesView from './WorkspacesView.astro';
 import BoardsView from './BoardsView.astro';
+import MembersTab from './MembersTab.astro';
+import SettingsView from './SettingsView.astro';
+
+const $dashboardView = useStore(dashboardView);
+const { currentView, selectedWorkspaceId } = $dashboardView;
 ---
 <main class="flex-1 p-8 bg-gray-50">
   <div class="max-w-4xl">
-    <div id="workspaces-view-container">
-      <WorkspacesView />
-    </div>
-    <div id="boards-view-container" class="hidden">
-      <!-- El contenido de BoardsView se renderizará aquí mediante script -->
-    </div>
+    {currentView === 'workspaces' && <WorkspacesView />}
+
+    {currentView === 'boards' && selectedWorkspaceId && (
+      <BoardsView workspaceId={selectedWorkspaceId} />
+    )}
+
+    {currentView === 'members' && selectedWorkspaceId && (
+      <MembersTab workspaceId={selectedWorkspaceId} />
+    )}
+
+    {currentView === 'settings' && selectedWorkspaceId && (
+      <SettingsView workspaceId={selectedWorkspaceId} />
+    )}
   </div>
 </main>
-
-<script>
-  import { dashboardView } from '../../store';
-
-  const workspacesView = document.getElementById('workspaces-view-container');
-  const boardsView = document.getElementById('boards-view-container');
-
-  dashboardView.subscribe(view => {
-    if (view.currentView === 'workspaces') {
-      workspacesView?.classList.remove('hidden');
-      boardsView?.classList.add('hidden');
-    } else if (view.currentView === 'boards' && view.selectedWorkspaceId) {
-      workspacesView?.classList.add('hidden');
-      boardsView?.classList.remove('hidden');
-      // Aquí necesitaríamos una forma de renderizar BoardsView con el workspaceId correcto.
-      // Dado que no podemos pasar props de Astro en el cliente, 
-      // vamos a usar un truco y notificar a otro script.
-      boardsView.innerHTML = `<div id="boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div id="boards-loading" class="col-span-full text-center text-gray-500">
-                                  Cargando tableros para ${view.selectedWorkspaceId}...
-                                </div>
-                              </div>`;
-      document.dispatchEvent(new CustomEvent('show-boards', { detail: { workspaceId: view.selectedWorkspaceId } }));
-    }
-  });
-</script>

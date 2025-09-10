@@ -4,7 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/auth';
 import { subscribeToUserWorkspaces } from '../firebase/api';
 import type { Workspace as DomainWorkspace } from '../types/domain';
-import { showBoards, showWorkspaces } from '../store'; // <-- IMPORTANTE: Importar acciones del store
+import { showBoards, showMembers, showSettings, showWorkspaces } from '../store';
 
 type Workspace = DomainWorkspace;
 
@@ -48,10 +48,10 @@ function renderWorkspaces(workspaces: Workspace[]) {
             <a href="#" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors boards-btn">
               <span>Tableros</span>
             </a>
-            <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+            <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors members-btn">
               <span>Miembros</span>
             </a>
-            <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors">
+            <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors settings-btn">
               <span>Configuración</span>
             </a>
           </div>
@@ -102,10 +102,15 @@ function initializeSidebarIsland() {
         const workspaceId = actionLink.dataset.workspaceId;
         const action = actionLink.dataset.action;
         
-        if (workspaceId && action === 'boards') {
-          showBoards(workspaceId); // <-- AHORA: Llamada al store
+        if (workspaceId) {
+          if (action === 'boards') {
+            showBoards(workspaceId);
+          } else if (action === 'members') {
+            showMembers(workspaceId);
+          } else if (action === 'config') {
+            showSettings(workspaceId);
+          }
         }
-        // Aquí se podrían manejar otras acciones como 'members' o 'config'
         return;
       }
 
