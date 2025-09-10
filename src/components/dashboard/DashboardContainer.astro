@@ -1,30 +1,68 @@
 ---
 // src/components/dashboard/DashboardContainer.astro
-import { useStore } from 'nanostores/astro'; // <-- ESTA ES LA LÍNEA CRÍTICA Y CORRECTA
 import { dashboardView } from '../../store';
 
 import WorkspacesView from './WorkspacesView.astro';
 import BoardsView from './BoardsView.astro';
 import MembersTab from './MembersTab.astro';
 import SettingsView from './SettingsView.astro';
-
-const $dashboardView = useStore(dashboardView);
-const { currentView, selectedWorkspaceId } = $dashboardView;
 ---
+
 <main class="flex-1 p-8 bg-gray-50">
   <div class="max-w-4xl">
-    {currentView === 'workspaces' && <WorkspacesView />}
+    <div id="workspaces-view" class="view hidden">
+      <WorkspacesView />
+    </div>
 
-    {currentView === 'boards' && selectedWorkspaceId && (
-      <BoardsView workspaceId={selectedWorkspaceId} />
-    )}
+    <div id="boards-view" class="view hidden">
+      <BoardsView workspaceId="" />
+    </div>
 
-    {currentView === 'members' && selectedWorkspaceId && (
-      <MembersTab workspaceId={selectedWorkspaceId} />
-    )}
+    <div id="members-view" class="view hidden">
+      <MembersTab workspaceId="" />
+    </div>
 
-    {currentView === 'settings' && selectedWorkspaceId && (
-      <SettingsView workspaceId={selectedWorkspaceId} />
-    )}
+    <div id="settings-view" class="view hidden">
+      <SettingsView workspaceId="" />
+    </div>
   </div>
 </main>
+
+<script>
+  import { dashboardView } from '../../store';
+
+  function updateView() {
+    const { currentView, selectedWorkspaceId } = dashboardView.get();
+
+    // Ocultar todas las vistas
+    document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+
+    // Mostrar la vista actual
+    const activeView = document.getElementById(`${currentView}-view`);
+    if (activeView) {
+      activeView.classList.remove('hidden');
+
+      // Actualizar workspaceId si es necesario
+      if (selectedWorkspaceId && (currentView === 'boards' || currentView === 'members' || currentView === 'settings')) {
+        const component = activeView.querySelector('[data-workspace-id]');
+        if (component) {
+          component.setAttribute('workspace-id', selectedWorkspaceId);
+        }
+      }
+    }
+  }
+
+  // Render inicial
+  updateView();
+
+  // Escuchar cambios en el store
+  dashboardView.subscribe(() => {
+    updateView();
+  });
+</script>
+
+<style>
+  .view.hidden {
+    display: none;
+  }
+</style>
