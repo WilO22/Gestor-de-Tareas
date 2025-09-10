@@ -1,13 +1,77 @@
 ---
 // src/components/dashboard/WorkspacesView.astro
 ---
+
+
 <div>
-  <h1 class="text-2xl font-semibold text-gray-800 mb-8">
-    TUS ESPACIOS DE TRABAJO
-  </h1>
-  <div id="workspaces-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <div id="loading-message" class="col-span-full text-center text-gray-500">
-      Cargando espacios de trabajo...
+  <h1 class="text-3xl font-bold text-gray-900 mb-8">Mis Espacios de Trabajo</h1>
+  <div
+    id="workspaces-row"
+    class="flex gap-6 overflow-x-auto pb-2 snap-x snap-mandatory"
+    style="scrollbar-width: thin;"
+  >
+  <div id="create-workspace-card-container"></div>
+    <div id="workspaces-cards" class="flex gap-6">
+      <!-- Las tarjetas de workspaces se renderizan aquí vía script -->
     </div>
   </div>
 </div>
+
+<script type="module" is:inline>
+  import { workspaceStore } from '../../stores/workspace.store';
+  import WorkspaceCard from '../workspace/WorkspaceCard.astro';
+  import { nanoid } from 'nanoid';
+
+  const cardsContainer = document.getElementById('workspaces-cards');
+  const loadingMsg = document.getElementById('loading-message');
+
+  function renderWorkspaceCards() {
+    if (!cardsContainer) return;
+    const workspaces = workspaceStore.getState().workspaces;
+    cardsContainer.innerHTML = '';
+    if (!workspaces || workspaces.length === 0) {
+      // Nada que mostrar
+      return;
+    }
+    workspaces.forEach(ws => {
+      const card = document.createElement('div');
+      card.className = 'snap-start';
+      card.innerHTML = `<div class="min-w-[220px]">${WorkspaceCard({
+        id: ws.id,
+        title: ws.name,
+        memberCount: ws.members?.length || 0,
+        color: 'pink',
+      })}</div>`;
+      cardsContainer.appendChild(card);
+    });
+  }
+
+  // Inicializar renderizado
+  function renderCreateCard() {
+    const createCardContainer = document.getElementById('create-workspace-card-container');
+    if (createCardContainer) {
+      createCardContainer.innerHTML = CreateWorkspaceCard;
+    }
+  }
+
+  renderCreateCard();
+  renderWorkspaceCards();
+  workspaceStore.subscribe(renderWorkspaceCards);
+
+  // Manejar creación de workspace
+  document.addEventListener('create-workspace-requested', () => {
+    // Aquí puedes abrir un modal o crear con valores por defecto
+    const newWorkspace = {
+      id: nanoid(),
+      name: 'Nuevo Workspace',
+      members: [],
+      // ...otros campos por defecto
+    };
+    workspaceStore.addWorkspace(newWorkspace);
+    // Scroll automático a la nueva tarjeta
+    setTimeout(() => {
+      cardsContainer?.lastElementChild?.scrollIntoView({ behavior: 'smooth', inline: 'end' });
+    }, 100);
+  });
+  import CreateWorkspaceCard from './CreateWorkspaceCard.astro?raw';
+</script>

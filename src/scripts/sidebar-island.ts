@@ -31,27 +31,28 @@ function renderWorkspaces(workspaces: Workspace[]) {
     .map((workspace: Workspace) => {
       const isExpanded = expandedWorkspaceId === workspace.id;
       const initials = workspace.name?.split(' ').map((w: any) => w[0]).join('').toUpperCase().slice(0, 2) || '';
-      
       return `
-        <div class="workspace-item" data-workspace-id="${workspace.id}">
-          <div class="flex items-center justify-between workspace-toggle cursor-pointer" data-workspace-id="${workspace.id}" aria-expanded="${isExpanded ? 'true' : 'false'}">
-            <div class="flex items-center space-x-2">
-              <div class="w-6 h-6 bg-pink-500 rounded flex items-center justify-center text-xs font-bold">${initials}</div>
-              <span class="text-gray-900 text-sm">${workspace.name || 'Workspace'}</span>
+        <div class="workspace-item group" data-workspace-id="${workspace.id}">
+          <div class="flex items-center justify-between cursor-pointer workspace-toggle px-2 py-2 rounded-lg hover:bg-gray-100 transition-colors" data-workspace-id="${workspace.id}" aria-expanded="${isExpanded ? 'true' : 'false'}">
+            <div class="flex items-center space-x-2 select-workspace" data-workspace-id="${workspace.id}">
+              <div class="w-7 h-7 bg-pink-500 rounded flex items-center justify-center text-xs font-bold text-white">${initials}</div>
+              <span class="text-gray-900 text-sm font-medium">${workspace.name || 'Workspace'}</span>
             </div>
-            <div class="text-gray-400 hover:text-white">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div class="text-gray-400 group-hover:text-gray-600 transition-transform">
+              <svg class="w-4 h-4 transform ${isExpanded ? 'rotate-90' : ''} transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
           </div>
-
-          <div class="workspace-menu ml-8 mt-1 space-y-1 ${isExpanded ? '' : 'hidden'}" id="menu-${workspace.id}">
-            <a href="#" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors boards-btn">
+          <div class="workspace-menu ml-9 mt-1 space-y-1 ${isExpanded ? '' : 'hidden'}" id="menu-${workspace.id}">
+            <a href="#" data-action="boards" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-gray-700 hover:bg-blue-100 px-2 py-1 rounded text-sm transition-colors boards-btn">
+              <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
               <span>Tableros</span>
             </a>
-            <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors members-btn">
+            <a href="#" data-action="members" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-gray-700 hover:bg-blue-100 px-2 py-1 rounded text-sm transition-colors members-btn">
+              <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75"/></svg>
               <span>Miembros</span>
             </a>
-            <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-black hover:bg-blue-500 px-2 py-1 rounded text-sm transition-colors settings-btn">
+            <a href="#" data-action="config" data-workspace-id="${workspace.id}" class="flex items-center space-x-2 text-gray-700 hover:bg-blue-100 px-2 py-1 rounded text-sm transition-colors settings-btn">
+              <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               <span>Configuración</span>
             </a>
           </div>
@@ -96,25 +97,43 @@ function initializeSidebarIsland() {
       const target = e.target as HTMLElement;
       e.preventDefault(); // Prevenir navegación en todos los clics delegados
 
+
       // 1) Manejar clics en los enlaces de navegación (Tableros, Miembros, etc.)
       const actionLink = target.closest('a[data-action]') as HTMLAnchorElement | null;
       if (actionLink) {
         const workspaceId = actionLink.dataset.workspaceId;
         const action = actionLink.dataset.action;
-        
         if (workspaceId) {
           if (action === 'boards') {
             showBoards(workspaceId);
+            expandedWorkspaceId = workspaceId; // Asegura que el menú quede abierto
+            toggleWorkspaceById(workspaceId);
           } else if (action === 'members') {
             showMembers(workspaceId);
+            expandedWorkspaceId = workspaceId;
+            toggleWorkspaceById(workspaceId);
           } else if (action === 'config') {
             showSettings(workspaceId);
+            expandedWorkspaceId = workspaceId;
+            toggleWorkspaceById(workspaceId);
           }
         }
         return;
       }
 
-      // 2) Manejar clics para expandir/colapsar un workspace.
+      // 2) Manejar clic en el nombre del workspace (select-workspace): selecciona Tableros y expande
+      const selectName = target.closest('.select-workspace');
+      if (selectName) {
+        const id = (selectName as HTMLElement).dataset.workspaceId;
+        if (id) {
+          showBoards(id);
+          expandedWorkspaceId = id;
+          toggleWorkspaceById(id);
+        }
+        return;
+      }
+
+      // 3) Manejar clics para expandir/colapsar un workspace (flecha o fondo)
       const toggleEl = target.closest('.workspace-toggle');
       if (toggleEl) {
         const id = (toggleEl as HTMLElement).dataset.workspaceId;

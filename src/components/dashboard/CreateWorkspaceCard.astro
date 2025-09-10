@@ -1,0 +1,33 @@
+---
+// src/components/dashboard/CreateWorkspaceCard.astro
+// Tarjeta especial para crear un nuevo workspace
+---
+<div
+  tabindex="0"
+  role="button"
+  class="flex flex-col items-center justify-center min-w-[220px] h-40 bg-white border-2 border-dashed border-blue-400 rounded-xl shadow-sm cursor-pointer hover:border-blue-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-150 select-none"
+  id="create-workspace-card"
+>
+  <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-2">
+    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+  </div>
+  <span class="text-base font-semibold text-blue-700 text-center leading-tight">
+    Crear un espacio de<br />trabajo nuevo
+  </span>
+</div>
+<script type="module" is:inline>
+  // Emitir evento personalizado al hacer click o enter
+  const card = document.getElementById('create-workspace-card');
+  if (card) {
+    card.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('create-workspace-requested'));
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        document.dispatchEvent(new CustomEvent('create-workspace-requested'));
+      }
+    });
+  }
+</script>
