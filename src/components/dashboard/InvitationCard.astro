@@ -1,0 +1,254 @@
+---
+// // src/components/dashboard/InvitationCard.astro
+// // Componente Astro puro para renderizar una tarjeta de invitación pendiente
+// // REFACTORIZACIÓN: Separado para mejor organización
+
+interface Props {
+  invitation: {
+    id: string;
+    inviteeEmail: string;
+    inviterName?: string;
+    createdAt: Date;
+    message?: string;
+    status: string;
+  };
+  workspaceId: string;
+  canManage: boolean;
+}
+
+const { invitation, workspaceId, canManage } = Astro.props;
+// workspaceId may be unused in some render flows; keep a void reference to avoid ts(6133)
+void workspaceId;
+
+// // Función para obtener iniciales del email
+function getEmailInitials(email: string): string {
+  return email.charAt(0).toUpperCase();
+}
+
+// // Función para formatear fecha
+function formatDate(date: Date): string {
+  return new Intl.RelativeTimeFormat('es', { numeric: 'auto' }).format(
+    Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+    'day'
+  );
+}
+---
+
+<div class="invitation-card flex items-center justify-between p-4 border border-yellow-200 rounded-lg bg-yellow-50 hover:bg-yellow-100 transition-colors">
+  <!-- // Información de la invitación -->
+  <div class="flex items-center space-x-3">
+    <!-- // Avatar con iniciales -->
+    <div class="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+      {getEmailInitials(invitation.inviteeEmail)}
+    </div>
+    
+    <!-- // Detalles de la invitación -->
+    <div class="flex-1 min-w-0">
+      <h4 class="font-medium text-gray-900">{invitation.inviteeEmail}</h4>
+      <p class="text-sm text-yellow-700">Invitación pendiente</p>
+      {invitation.inviterName && (
+        <p class="text-xs text-gray-500">Invitado por {invitation.inviterName}</p>
+      )}
+      <p class="text-xs text-gray-400">
+        {formatDate(invitation.createdAt)}
+      </p>
+    </div>
+  </div>
+  
+  <!-- // Acciones -->
+  <div class="flex items-center space-x-2">
+    <!-- // Botón copiar enlace -->
+    <button 
+      class="copy-invitation-btn text-blue-600 hover:text-blue-800 p-2 rounded transition-colors"
+      data-invitation-id={invitation.id}
+      title="Copiar enlace de invitación"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+      </svg>
+    </button>
+    
+    <!-- // Botón reenviar invitación -->
+    <button 
+      class="resend-invitation-btn text-green-600 hover:text-green-800 p-2 rounded transition-colors"
+      data-invitation-id={invitation.id}
+      data-invitee-email={invitation.inviteeEmail}
+      title="Reenviar invitación"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+    </button>
+    
+    <!-- // Botón cancelar invitación (solo si puede gestionar) -->
+    {canManage && (
+      <button 
+        class="cancel-invitation-btn text-red-600 hover:text-red-800 p-2 rounded transition-colors"
+        data-invitation-id={invitation.id}
+        data-invitee-email={invitation.inviteeEmail}
+        title="Cancelar invitación"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    )}
+  </div>
+</div>
+
+<script>
+  // // Script específico del componente InvitationCard
+  
+  // // Configurar event listeners para este componente
+  function setupInvitationCardEvents() {
+    // // Event listeners para copiar enlace
+    document.querySelectorAll('.copy-invitation-btn').forEach(btn => {
+      btn.removeEventListener('click', handleCopyInvitation);
+      btn.addEventListener('click', handleCopyInvitation);
+    });
+    
+    // // Event listeners para reenviar invitación
+    document.querySelectorAll('.resend-invitation-btn').forEach(btn => {
+      btn.removeEventListener('click', handleResendInvitation);
+      btn.addEventListener('click', handleResendInvitation);
+    });
+    
+    // // Event listeners para cancelar invitación
+    document.querySelectorAll('.cancel-invitation-btn').forEach(btn => {
+      btn.removeEventListener('click', handleCancelInvitation);
+      btn.addEventListener('click', handleCancelInvitation);
+    });
+  }
+  
+  // // Handler para copiar enlace de invitación
+  function handleCopyInvitation(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const invitationId = btn.dataset.invitationId;
+    
+    if (!invitationId) {
+      console.error('❌ InvitationCard: ID de invitación no encontrado');
+      return;
+    }
+    
+    const invitationUrl = `${window.location.origin}/accept-invitation/${invitationId}`;
+    
+    navigator.clipboard.writeText(invitationUrl).then(() => {
+      showToast('Enlace de invitación copiado al portapapeles', 'success');
+      
+      // // Feedback visual
+      const originalIcon = btn.innerHTML;
+      btn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      `;
+      btn.classList.add('text-green-600');
+      
+      setTimeout(() => {
+        btn.innerHTML = originalIcon;
+        btn.classList.remove('text-green-600');
+      }, 2000);
+    }).catch(() => {
+      showToast('Error al copiar enlace', 'error');
+    });
+  }
+  
+  // // Handler para reenviar invitación
+  function handleResendInvitation(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const invitationId = btn.dataset.invitationId;
+    const inviteeEmail = btn.dataset.inviteeEmail;
+    
+    if (!invitationId || !inviteeEmail) {
+      console.error('❌ InvitationCard: Datos de invitación no encontrados');
+      return;
+    }
+    
+    if (confirm(`¿Reenviar invitación a ${inviteeEmail}?`)) {
+      // // TODO: Implementar reenvío de invitación
+      showToast('Función de reenvío en desarrollo', 'info');
+    }
+  }
+  
+  // // Handler para cancelar invitación
+  async function handleCancelInvitation(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.currentTarget as HTMLElement;
+    const invitationId = btn.dataset.invitationId;
+    const inviteeEmail = btn.dataset.inviteeEmail;
+    
+    if (!invitationId) {
+      console.error('❌ InvitationCard: ID de invitación no encontrado');
+      return;
+    }
+    
+    if (confirm(`¿Estás seguro de que quieres cancelar la invitación a ${inviteeEmail}?`)) {
+      try {
+        // // Usar el handler del módulo de member management
+        if (typeof (window as any).MemberManagementUtils?.cancelInvitationHandler === 'function') {
+          await (window as any).MemberManagementUtils.cancelInvitationHandler(invitationId);
+        } else {
+          console.error('❌ InvitationCard: MemberManagementUtils no disponible');
+          showToast('Error: Sistema de gestión no disponible', 'error');
+        }
+      } catch (error) {
+        console.error('❌ InvitationCard: Error cancelando invitación:', error);
+        showToast('Error inesperado cancelando invitación', 'error');
+      }
+    }
+  }
+  
+  // // Función auxiliar para mostrar toast
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+    if (typeof (window as any).showToast === 'function') {
+      (window as any).showToast({ message, type });
+    } else {
+      console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+  }
+  
+  // // Inicialización automática del componente
+  setupInvitationCardEvents();
+  
+  // // Hacer función disponible globalmente para re-inicialización
+  (window as any).setupInvitationCardEvents = setupInvitationCardEvents;
+</script>
+
+<style>
+  /* // Estilos específicos del componente InvitationCard */
+  .invitation-card {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .invitation-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .copy-invitation-btn,
+  .resend-invitation-btn,
+  .cancel-invitation-btn {
+    opacity: 0.7;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .invitation-card:hover .copy-invitation-btn,
+  .invitation-card:hover .resend-invitation-btn,
+  .invitation-card:hover .cancel-invitation-btn {
+    opacity: 1;
+  }
+  
+  .copy-invitation-btn:hover,
+  .resend-invitation-btn:hover,
+  .cancel-invitation-btn:hover {
+    transform: scale(1.1);
+  }
+</style>

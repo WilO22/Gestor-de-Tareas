@@ -1,0 +1,236 @@
+---
+// src/components/base/BaseModal.astro
+// Modal base reutilizable para todo el sistema - MEJORADO
+
+export interface Props {
+  // Identificación
+  id: string;
+  
+  // Contenido - MEJORADO
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  
+  // Configuración - MEJORADO
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+  closable?: boolean;
+  closeOnOverlay?: boolean;
+  closeOnEscape?: boolean;
+  showHeader?: boolean;
+  showFooter?: boolean;
+  showCloseButton?: boolean;
+  
+  // Animaciones - NUEVO
+  animation?: 'fade' | 'scale' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right';
+  animationDuration?: number;
+  
+  // Tema y colores - NUEVO
+  theme?: 'light' | 'dark' | 'auto';
+  variant?: 'default' | 'glass' | 'blur';
+  
+  // Estados - MEJORADO
+  loading?: boolean;
+  fullscreen?: boolean;
+  centered?: boolean;
+  
+  // Accesibilidad - NUEVO
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  role?: 'dialog' | 'alertdialog';
+  
+  // Clases adicionales
+  class?: string;
+  headerClass?: string;
+  bodyClass?: string;
+  footerClass?: string;
+}
+
+const {
+  id,
+  title,
+  subtitle,
+  description,
+  size = 'md',
+  closable = true,
+  closeOnOverlay = true,
+  closeOnEscape: _closeOnEscape = true,
+  showHeader = true,
+  showFooter = false,
+  showCloseButton = true,
+  animation = 'scale',
+  animationDuration = 300,
+  theme: _theme = 'auto',
+  variant = 'default',
+  loading = false,
+  fullscreen = false,
+  centered = true,
+  ariaLabel,
+  ariaDescribedBy,
+  role = 'dialog',
+  class: additionalClasses = '',
+  headerClass = '',
+  bodyClass = '',
+  footerClass = ''
+} = Astro.props;
+
+// Tamaños del modal - MEJORADO
+const sizeClasses = {
+  xs: 'max-w-xs',
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  full: 'max-w-full mx-4'
+};
+
+// Animaciones - NUEVO
+const animationClasses = {
+  fade: 'opacity-0',
+  scale: 'scale-95 opacity-0',
+  'slide-up': 'translate-y-4 opacity-0',
+  'slide-down': '-translate-y-4 opacity-0',
+  'slide-left': 'translate-x-4 opacity-0',
+  'slide-right': '-translate-x-4 opacity-0'
+};
+
+// Variantes - NUEVO
+const variantClasses = {
+  default: 'bg-white',
+  glass: 'bg-white/90 backdrop-blur-md',
+  blur: 'bg-white/80 backdrop-blur-lg'
+};
+
+// Tema - NUEVO (no se usa actualmente)
+---
+
+<!-- Overlay del modal -->
+<div 
+  id={`${id}-overlay`}
+  class="modal-overlay fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300"
+  data-close-on-overlay={closeOnOverlay}
+>
+  <!-- Container del modal mejorado -->
+  <div class={`flex ${centered ? 'items-center' : 'items-start pt-16'} justify-center min-h-screen p-4`}>
+    <div 
+      id={id}
+      class={`modal-content ${variantClasses[variant]} rounded-lg shadow-xl transform ${animationClasses[animation]} transition-all duration-${animationDuration} w-full ${sizeClasses[size]} ${fullscreen ? 'h-full' : ''} ${additionalClasses}`}
+      role={role}
+      aria-modal="true"
+      aria-labelledby={title ? `${id}-title` : undefined}
+      aria-describedby={ariaDescribedBy}
+      aria-label={ariaLabel}
+    >
+      
+      {loading ? (
+        <!-- Estado de carga -->
+        <div class="p-8 text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p class="text-gray-600">Cargando...</p>
+        </div>
+      ) : (
+        <>
+          <!-- Header del modal mejorado -->
+          {showHeader && (
+            <div class={`modal-header px-6 py-4 border-b border-gray-200 flex items-center justify-between ${headerClass}`}>
+              <div class="flex-1 min-w-0">
+                {title && (
+                  <h2 id={`${id}-title`} class="text-xl font-semibold text-gray-900 truncate">
+                    {title}
+                  </h2>
+                )}
+                {subtitle && (
+                  <p class="text-sm text-gray-600 mt-1">
+                    {subtitle}
+                  </p>
+                )}
+                {description && (
+                  <p class="text-sm text-gray-500 mt-2">
+                    {description}
+                  </p>
+                )}
+                <slot name="header-content" />
+              </div>
+              
+              {closable && showCloseButton && (
+                <button 
+                  class="modal-close-btn ml-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  data-modal-id={id}
+                  aria-label="Cerrar modal"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+          
+          <!-- Cuerpo del modal -->
+          <div class={`modal-body px-6 py-4 ${bodyClass}`}>
+            <slot />
+          </div>
+          
+          <!-- Footer del modal -->
+          {showFooter && (
+            <div class={`modal-footer px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-3 ${footerClass}`}>
+              <slot name="footer">
+                {closable && (
+                  <button 
+                    class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    data-modal-id={id}
+                    data-action="close"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button 
+                  class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                  data-modal-id={id}
+                  data-action="confirm"
+                >
+                  Confirmar
+                </button>
+              </slot>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  </div>
+</div>
+
+<!-- Script procesado: inicializador del modal -->
+<script src="../../scripts/modal.ts"></script>
+
+<style>
+  /* Estilos para el modal */
+  .modal-overlay {
+    backdrop-filter: blur(4px);
+  }
+  
+  .modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  /* Scrollbar personalizado para el modal */
+  .modal-content::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .modal-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .modal-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .modal-content::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+</style>

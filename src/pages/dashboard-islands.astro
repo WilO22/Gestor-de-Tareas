@@ -1,0 +1,511 @@
+---
+// src/pages/dashboard-islands.astro
+// Dashboard refactorizado usando Server Islands para mejor performance
+
+import Layout from "../layouts/Layout.astro";
+import DashboardHeader from "../components/dashboard/DashBoardHeader.astro";
+import SidebarIsland from "../components/dashboard/SidebarIsland.astro";
+import WorkspacesViewIsland from "../components/dashboard/WorkspacesViewIsland.astro";
+import MembersManagementIsland from "../components/dashboard/MembersManagementIsland.astro";
+---
+
+<Layout title="Dashboard - Server Islands">
+  
+  <!-- Loading screen inicial -->
+  <div id="loading-screen" class="h-screen flex items-center justify-center bg-gray-50">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <div class="text-lg text-gray-600 mb-2">Cargando dashboard...</div>
+      <div class="text-sm text-gray-500">Inicializando Server Islands...</div>
+    </div>
+  </div>
+
+  <!-- Aplicación principal -->
+  <div id="app-container" class="hidden h-screen overflow-hidden">
+    
+    <!-- Header del dashboard -->
+    <DashboardHeader />
+
+    <div class="flex h-screen">
+      
+      <!-- Sidebar Island - Renderizado en servidor -->
+      <SidebarIsland server:defer userId="" />
+
+      <!-- Contenido principal -->
+      <main class="flex-1 overflow-auto bg-gray-50">
+        <div class="p-8">
+          
+          <!-- Vista de workspaces - Server Island -->
+          <div id="workspaces-view" class="workspace-view-container">
+            <WorkspacesViewIsland server:defer userId="" />
+          </div>
+
+          <!-- Vista de boards de un workspace específico -->
+          <div id="boards-view" class="hidden workspace-boards-container">
+            <div class="flex items-center space-x-4 mb-8">
+              <button id="back-to-workspaces" class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                <span>Volver a workspaces</span>
+              </button>
+            </div>
+            
+            <!-- Header del workspace actual -->
+            <div class="flex items-center space-x-4 mb-8">
+              <div id="workspace-avatar" class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                W
+              </div>
+              <div class="flex-1">
+                <h2 id="workspace-name" class="text-2xl font-semibold text-gray-800">Workspace</h2>
+                <p id="workspace-description" class="text-gray-600">Descripción del workspace</p>
+              </div>
+            </div>
+
+            <!-- Tabs de navegación del workspace -->
+            <div class="border-b border-gray-200 mb-8">
+              <nav class="-mb-px flex space-x-8">
+                <button 
+                  id="boards-tab" 
+                  class="workspace-tab active py-3 px-1 border-b-2 border-blue-500 font-medium text-blue-600"
+                  data-tab="boards"
+                >
+                  <div class="flex items-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <span>Tableros</span>
+                  </div>
+                </button>
+                
+                <button 
+                  id="members-tab" 
+                  class="workspace-tab py-3 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  data-tab="members"
+                >
+                  <div class="flex items-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197H9m3 0a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>Miembros</span>
+                  </div>
+                </button>
+              </nav>
+            </div>
+
+            <!-- Contenido de tabs del workspace -->
+            <div class="workspace-tab-content">
+              
+              <!-- Tab de tableros -->
+              <div id="boards-content" class="tab-pane active">
+                <div class="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Tableros del Workspace</h3>
+                    <p class="text-gray-600">Organiza tu trabajo en tableros</p>
+                  </div>
+                  <button id="create-board-btn" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span>Nuevo Tablero</span>
+                  </button>
+                </div>
+                
+                <!-- Lista de tableros -->
+                <div id="boards-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <!-- Los tableros se cargarán dinámicamente -->
+                  <div class="animate-pulse">
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                      <div class="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
+                      <div class="h-3 bg-gray-300 rounded w-1/2 mb-2"></div>
+                      <div class="h-3 bg-gray-300 rounded w-2/3"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab de miembros - Server Island -->
+              <div id="members-content" class="tab-pane hidden">
+                <MembersManagementIsland 
+                  workspaceId=""
+                  currentUserId=""
+                  currentUserRole="member"
+                  server:defer
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modales y componentes auxiliares -->
+  <div id="modals-container">
+    <!-- Los modales se insertarán aquí dinámicamente -->
+  </div>
+
+  <!-- Scripts del dashboard -->
+  <script>
+    // Script principal del dashboard con Server Islands
+    import { onAuthStateChanged } from 'firebase/auth';
+    import { auth } from '../firebase/auth';
+    import { getWorkspaceById, getWorkspaceBoards } from '../firebase/api';
+    import type { Workspace, Board } from '../types/domain';
+
+    console.log('🚀 Dashboard Islands: Inicializando...');
+
+    // Estado global del dashboard
+    interface DashboardState {
+      user: any | null;
+      currentView: 'workspaces' | 'workspace';
+      currentWorkspace: Workspace | null;
+      currentWorkspaceId: string | null;
+      currentTab: 'boards' | 'members';
+      loading: boolean;
+    }
+
+    let dashboardState: DashboardState = {
+      user: null,
+      currentView: 'workspaces',
+      currentWorkspace: null,
+      currentWorkspaceId: null,
+      currentTab: 'boards',
+      loading: true
+    };
+
+    // Elementos del DOM
+    const elements = {
+      loadingScreen: document.getElementById('loading-screen'),
+      appContainer: document.getElementById('app-container'),
+      workspacesView: document.getElementById('workspaces-view'),
+      boardsView: document.getElementById('boards-view'),
+      backToWorkspaces: document.getElementById('back-to-workspaces'),
+      workspaceAvatar: document.getElementById('workspace-avatar'),
+      workspaceName: document.getElementById('workspace-name'),
+      workspaceDescription: document.getElementById('workspace-description'),
+      boardsTab: document.getElementById('boards-tab'),
+      membersTab: document.getElementById('members-tab'),
+      boardsContent: document.getElementById('boards-content'),
+      membersContent: document.getElementById('members-content'),
+      boardsList: document.getElementById('boards-list'),
+      createBoardBtn: document.getElementById('create-board-btn')
+    };
+
+    // Función para mostrar la aplicación
+    function showApp() {
+      elements.loadingScreen?.classList.add('hidden');
+      elements.appContainer?.classList.remove('hidden');
+      dashboardState.loading = false;
+    }
+
+    // Función para navegar a vista de workspace
+    async function navigateToWorkspace(workspaceId: string) {
+      console.log('🚀 Dashboard: Navegando a workspace', workspaceId);
+
+      try {
+        dashboardState.loading = true;
+        dashboardState.currentWorkspaceId = workspaceId;
+
+      // Cargar datos del workspace
+      const workspace = await getWorkspaceById(workspaceId);
+      dashboardState.currentWorkspace = workspace;
+
+      // Actualizar UI del workspace (aceptamos null y hacemos guard)
+      updateWorkspaceHeader(workspace);
+
+        // Cambiar vista
+        elements.workspacesView?.classList.add('hidden');
+        elements.boardsView?.classList.remove('hidden');
+        dashboardState.currentView = 'workspace';
+
+        // Cargar tableros por defecto
+        switchWorkspaceTab('boards');
+
+        dashboardState.loading = false;
+
+  // notify sidebar that navigation finished successfully
+  try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action: 'boards', workspaceId } })); } catch (e) { /* ignore */ }
+
+      } catch (error) {
+        console.error('❌ Dashboard: Error navegando a workspace:', error);
+        showToast('Error al cargar el workspace', 'error');
+        dashboardState.loading = false;
+      }
+    }
+
+    // Función para volver a vista de workspaces
+    function navigateToWorkspaces() {
+      console.log('🚀 Dashboard: Volviendo a vista de workspaces');
+
+      elements.boardsView?.classList.add('hidden');
+      elements.workspacesView?.classList.remove('hidden');
+      dashboardState.currentView = 'workspaces';
+      dashboardState.currentWorkspace = null;
+      dashboardState.currentWorkspaceId = null;
+    }
+
+    // Función para actualizar header del workspace
+    function updateWorkspaceHeader(workspace: Workspace | null) {
+      if (!workspace) {
+        if (elements.workspaceName) elements.workspaceName.textContent = '';
+        if (elements.workspaceDescription) elements.workspaceDescription.textContent = '';
+        if (elements.workspaceAvatar) elements.workspaceAvatar.textContent = '';
+        return;
+      }
+
+      if (elements.workspaceAvatar) {
+        const initials = workspace.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        elements.workspaceAvatar.textContent = initials;
+      }
+
+      if (elements.workspaceName) {
+        elements.workspaceName.textContent = workspace.name;
+      }
+
+      if (elements.workspaceDescription) {
+        elements.workspaceDescription.textContent = workspace.description || 'Sin descripción';
+      }
+    }
+
+    // Función para cambiar tab del workspace
+    function switchWorkspaceTab(tabName: 'boards' | 'members') {
+      dashboardState.currentTab = tabName;
+
+      // Actualizar botones de tab
+      document.querySelectorAll('.workspace-tab').forEach(tab => {
+        tab.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Actualizar contenido de tabs
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.add('hidden');
+        pane.classList.remove('active');
+      });
+
+      // Activar tab seleccionado
+      if (tabName === 'boards') {
+        elements.boardsTab?.classList.add('active', 'border-blue-500', 'text-blue-600');
+        elements.boardsTab?.classList.remove('border-transparent', 'text-gray-500');
+        elements.boardsContent?.classList.remove('hidden');
+        elements.boardsContent?.classList.add('active');
+        
+        // Cargar tableros
+        loadWorkspaceBoards();
+      } else {
+        elements.membersTab?.classList.add('active', 'border-blue-500', 'text-blue-600');
+        elements.membersTab?.classList.remove('border-transparent', 'text-gray-500');
+        elements.membersContent?.classList.remove('hidden');
+        elements.membersContent?.classList.add('active');
+        
+        // Actualizar props del Members Management Island
+        updateMembersIslandProps();
+      }
+    }
+
+    // Función para cargar tableros del workspace
+    async function loadWorkspaceBoards() {
+      if (!dashboardState.currentWorkspaceId || !elements.boardsList) return;
+
+      console.log('🚀 Dashboard: Cargando tableros del workspace');
+
+      try {
+        const boards = await getWorkspaceBoards(dashboardState.currentWorkspaceId);
+        renderBoards(boards);
+      } catch (error) {
+        console.error('❌ Dashboard: Error cargando tableros:', error);
+        showToast('Error al cargar los tableros', 'error');
+      }
+    }
+
+    // Función para renderizar tableros
+    function renderBoards(boards: Board[]) {
+      if (!elements.boardsList) return;
+
+      if (boards.length === 0) {
+        elements.boardsList.innerHTML = `
+          <div class="col-span-full text-center py-16">
+            <div class="text-gray-400 mb-4">
+              <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay tableros aún</h3>
+            <p class="text-gray-500 mb-4">Crea tu primer tablero para empezar a organizar tareas</p>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors" onclick="document.getElementById('create-board-btn').click()">
+              Crear Primer Tablero
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const boardsHTML = boards.map(board => `
+        <a href="/workspace/${dashboardState.currentWorkspaceId}/board/${board.id}" class="block bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md hover:scale-105 transition-all duration-200">
+          <h4 class="font-semibold text-gray-900 mb-2">${board.title}</h4>
+          <p class="text-sm text-gray-600 mb-4">${board.description || 'Sin descripción'}</p>
+          <div class="flex items-center justify-between text-xs text-gray-500">
+            <span>${board.columns?.length || 0} columnas</span>
+            <span>Actualizado recientemente</span>
+          </div>
+        </a>
+      `).join('');
+
+      elements.boardsList.innerHTML = boardsHTML;
+    }
+
+    // Función para actualizar props del Members Island
+    function updateMembersIslandProps() {
+      if (!dashboardState.currentWorkspaceId || !dashboardState.user) return;
+
+      // Buscar el island de miembros y actualizar sus datos
+      const membersIsland = elements.membersContent?.querySelector('.members-management-island');
+      if (membersIsland) {
+        membersIsland.setAttribute('data-workspace-id', dashboardState.currentWorkspaceId);
+        
+        // Trigger reload del island
+        const reloadEvent = new CustomEvent('members-island-reload', {
+          detail: {
+            workspaceId: dashboardState.currentWorkspaceId,
+            currentUserId: dashboardState.user.uid,
+            currentUserRole: 'member' // TODO: Obtener rol real del usuario
+          }
+        });
+        document.dispatchEvent(reloadEvent);
+      }
+    }
+
+    // Función auxiliar para mostrar toasts
+    function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+      if (typeof (window as any).showToast === 'function') {
+        (window as any).showToast({ message, type });
+      } else {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+      }
+    }
+
+    // Event listeners
+    function setupEventListeners() {
+      // Navegación
+      elements.backToWorkspaces?.addEventListener('click', navigateToWorkspaces);
+
+      // Tabs del workspace
+      elements.boardsTab?.addEventListener('click', () => switchWorkspaceTab('boards'));
+      elements.membersTab?.addEventListener('click', () => switchWorkspaceTab('members'));
+
+      // Crear tablero
+      elements.createBoardBtn?.addEventListener('click', () => {
+        // TODO: Implementar creación de tablero
+        showToast('Funcionalidad de crear tablero en desarrollo', 'info');
+      });
+
+      // Event listeners globales para comunicación entre islands
+      document.addEventListener('create-workspace-requested', () => {
+        // TODO: Implementar creación de workspace
+        showToast('Funcionalidad de crear workspace en desarrollo', 'info');
+      });
+
+      document.addEventListener('show-member-options', (event: any) => {
+        // TODO: Implementar opciones de miembros
+        console.log('Show member options:', event.detail);
+        showToast('Opciones de miembros en desarrollo', 'info');
+      });
+
+      document.addEventListener('invite-member-requested', (event: any) => {
+        // TODO: Implementar invitación de miembros
+        console.log('Invite member requested:', event.detail);
+        showToast('Funcionalidad de invitar miembros en desarrollo', 'info');
+      });
+    }
+
+    // Función para manejar navegación desde URLs
+    function handleUrlNavigation() {
+      const url = new URL(window.location.href);
+      const path = url.pathname;
+
+      // Extraer workspace ID de la URL si existe
+      const workspaceMatch = path.match(/\/workspace\/([^\/]+)/);
+      if (workspaceMatch) {
+        const workspaceId = workspaceMatch[1];
+        navigateToWorkspace(workspaceId);
+      }
+    }
+
+    // Inicialización principal del dashboard
+    function initializeDashboard() {
+      console.log('🚀 Dashboard Islands: Configurando event listeners...');
+      setupEventListeners();
+
+      // Suscribirse a cambios de autenticación
+      onAuthStateChanged(auth, (user) => {
+        dashboardState.user = user;
+
+        if (user) {
+          console.log('🚀 Dashboard: Usuario autenticado:', user.uid);
+          showApp();
+          handleUrlNavigation();
+        } else {
+          console.log('🚀 Dashboard: Usuario no autenticado, redirigiendo...');
+          window.location.href = '/login';
+        }
+      });
+    }
+
+    // Auto-inicialización
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeDashboard);
+    } else {
+      initializeDashboard();
+    }
+
+    // API pública para debugging
+    (window as any).dashboardIslands = {
+      state: () => dashboardState,
+      navigateToWorkspace,
+      navigateToWorkspaces,
+      switchWorkspaceTab,
+      loadWorkspaceBoards
+    };
+  </script>
+
+  <style>
+    /* Estilos específicos del Dashboard Islands */
+    .workspace-view-container,
+    .workspace-boards-container {
+      transition: all 0.3s ease-in-out;
+    }
+    
+    .workspace-tab.active {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    
+    .tab-pane {
+      min-height: 400px;
+    }
+    
+    /* Mejoras visuales */
+    #app-container {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+    
+    /* Scrollbar personalizado */
+    main::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    main::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    
+    main::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    
+    main::-webkit-scrollbar-thumb:hover {
+      background: #a1a1a1;
+    }
+  </style>
+</Layout>

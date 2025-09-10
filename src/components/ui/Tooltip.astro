@@ -1,0 +1,134 @@
+---
+// src/components/ui/Tooltip.astro
+// Componente Tooltip reutilizable
+
+export interface Props {
+  // Contenido
+  text?: string;
+  content?: string;
+  
+  // Posición
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
+  
+  // Disparadores
+  trigger?: 'hover' | 'click' | 'focus';
+  
+  // Tema y colores
+  theme?: 'light' | 'dark' | 'auto';
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  
+  // Animación
+  animation?: 'fade' | 'scale' | 'slide';
+  
+  // Estados
+  disabled?: boolean;
+  show?: boolean;
+  
+  // Accesibilidad
+  ariaLabel?: string;
+  
+  // Clases adicionales
+  class?: string;
+  tooltipClass?: string;
+}
+
+const {
+  text,
+  content,
+  position = 'top',
+  trigger: _trigger = 'hover',
+  theme: _theme = 'auto',
+  variant: _variant = 'default',
+  animation: _animation = 'fade',
+  disabled = false,
+  show: _show = false,
+  ariaLabel,
+  class: additionalClasses = '',
+  tooltipClass = ''
+} = Astro.props;
+
+// ID único para el tooltip
+const tooltipId = `tooltip-${Math.random().toString(36).slice(2, 11)}`;
+
+// Clases base para el trigger
+const triggerClasses = [
+  'relative inline-block',
+  additionalClasses
+].filter(Boolean).join(' ');
+
+// Variantes del tooltip
+const variantClasses = {
+  default: 'bg-gray-900 text-white',
+  primary: 'bg-blue-600 text-white',
+  success: 'bg-green-600 text-white',
+  warning: 'bg-yellow-600 text-black',
+  danger: 'bg-red-600 text-white'
+};
+
+// Posiciones
+const positionClasses = {
+  top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
+  bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-2',
+  left: 'right-full top-1/2 transform -translate-y-1/2 mr-2',
+  right: 'left-full top-1/2 transform -translate-y-1/2 ml-2',
+  auto: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2'
+};
+
+// Animaciones
+const animationClasses = {
+  fade: 'opacity-0 group-hover:opacity-100',
+  scale: 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100',
+  slide: 'opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0'
+};
+
+// Tema
+const themeClasses = {
+  light: '',
+  dark: 'dark',
+  auto: ''
+};
+
+// Clases finales del tooltip
+const tooltipClasses = [
+  'absolute z-50 px-3 py-2 text-sm font-medium rounded-lg shadow-lg',
+  'pointer-events-none whitespace-nowrap',
+  'transition-all duration-200 ease-in-out',
+  variantClasses[_variant as keyof typeof variantClasses],
+  positionClasses[position],
+  animationClasses[_animation as keyof typeof animationClasses],
+  themeClasses[_theme as keyof typeof themeClasses],
+  tooltipClass
+].filter(Boolean).join(' ');
+---
+
+<div class={triggerClasses} role="tooltip" aria-describedby={tooltipId}>
+  <!-- Trigger element -->
+  <div class="group">
+    <slot />
+    
+    <!-- Tooltip -->
+    {!disabled && (
+      <div
+        id={tooltipId}
+        class={tooltipClasses}
+        role="tooltip"
+        aria-label={ariaLabel}
+      >
+        {content || text || 'Tooltip content'}
+        
+        <!-- Flecha del tooltip -->
+  <div class={`absolute w-2 h-2 transform rotate-45 ${variantClasses[_variant as keyof typeof variantClasses]}`}
+             class:list={{
+               'top-full left-1/2 -translate-x-1/2 -mt-1': position === 'top',
+               'bottom-full left-1/2 -translate-x-1/2 -mb-1': position === 'bottom',
+               'left-full top-1/2 -translate-y-1/2 -ml-1': position === 'left',
+               'right-full top-1/2 -translate-y-1/2 -mr-1': position === 'right'
+             }}>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
+<!-- Script procesado: inicializador de tooltip -->
+<script src="../../scripts/tooltip.ts"></script>

@@ -1,0 +1,46 @@
+---
+// // Componente Toast global reutilizable
+// // Este componente proporciona un sistema de notificaciones centralizado
+// // que se puede usar desde cualquier página del proyecto
+---
+
+<!-- // Container del sistema de toast - posición fija para mejor visibilidad -->
+<div id="toast-system" class="fixed inset-0 pointer-events-none z-[60] flex items-center justify-center">
+  <!-- // Overlay sutil para dar contexto -->
+  <div id="toast-overlay" class="absolute inset-0 bg-black/20 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+  
+  <!-- // Container de toast centrado -->
+  <div id="toast-container" class="relative z-10 pointer-events-none">
+    <!-- Los toasts se insertan aquí dinámicamente -->
+  </div>
+</div>
+
+<style>
+  /* // Asegurar que el sistema de toast esté por encima de todo */
+  #toast-system {
+    z-index: 9999;
+  }
+  
+  /* // Animaciones suaves para los toasts */
+  .toast-enter {
+    transform: scale(0.8) translateY(-20px);
+    opacity: 0;
+  }
+  
+  .toast-show {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  .toast-exit {
+    transform: scale(0.9) translateY(-10px);
+    opacity: 0;
+    transition: all 0.2s ease-out;
+  }
+</style>
+
+<script>
+  // Import processed TS module so Astro will bundle and process it (TypeScript enabled)
+  import '../../scripts/toast.ts';
+</script>

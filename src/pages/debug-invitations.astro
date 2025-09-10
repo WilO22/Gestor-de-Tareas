@@ -1,0 +1,268 @@
+---
+// src/pages/debug-invitations.astro
+// Página temporal de debugging para verificar invitaciones en Firestore
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Debug - Invitaciones">
+  <div class="min-h-screen bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-3xl font-bold mb-6">🔍 Debug - Sistema de Invitaciones</h1>
+      
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Conectividad y Estado</h2>
+        <div id="status" class="space-y-2">
+          <p id="auth-status" class="text-gray-600">Verificando autenticación...</p>
+          <p id="db-status" class="text-gray-600">Verificando conexión a Firestore...</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Lista de Invitaciones</h2>
+        <button id="load-invitations" class="bg-blue-600 text-white px-4 py-2 rounded mb-4">
+          Cargar Invitaciones
+        </button>
+        <div id="invitations-list" class="space-y-2">
+          <p class="text-gray-500">Haz clic en "Cargar Invitaciones" para ver todas las invitaciones</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">Crear Invitación de Prueba</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email de destino</label>
+            <input 
+              id="test-email" 
+              type="email" 
+              placeholder="tu-email@gmail.com" 
+              class="w-full p-2 border rounded"
+              value=""
+            >
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">ID del Workspace</label>
+            <input 
+              id="test-workspace" 
+              type="text" 
+              placeholder="Déjalo vacío para crear workspace automáticamente" 
+              class="w-full p-2 border rounded"
+            >
+            <p class="text-sm text-gray-500 mt-1">💡 Si no tienes un workspace, se creará uno automáticamente</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mensaje opcional</label>
+            <textarea 
+              id="test-message" 
+              placeholder="Invitación de prueba para debugging" 
+              class="w-full p-2 border rounded"
+            >¡Prueba tu sistema de invitaciones!</textarea>
+          </div>
+          <button id="create-invitation" class="bg-green-600 text-white px-4 py-2 rounded">
+            Crear Invitación de Prueba
+          </button>
+        </div>
+        <div id="creation-result" class="mt-4"></div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { auth } from '../firebase/auth';
+  import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
+  import { db } from '../firebase/client';
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { createInvitation } from '../firebase/invitations';
+
+  let currentUser: any = null;
+
+  // // Estados de UI
+  const authStatus = document.getElementById('auth-status');
+  const dbStatus = document.getElementById('db-status');
+  const invitationsList = document.getElementById('invitations-list');
+  const loadInvitationsBtn = document.getElementById('load-invitations');
+  const createInvitationBtn = document.getElementById('create-invitation');
+  const creationResult = document.getElementById('creation-result');
+
+  // // Monitorear autenticación
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    if (authStatus) {
+      authStatus.textContent = user 
+        ? `✅ Autenticado como: ${user.email} (${user.uid})`
+        : '❌ No autenticado';
+      authStatus.className = user ? 'text-green-600' : 'text-red-600';
+    }
+  });
+
+  // // Verificar conexión a Firestore
+  async function checkFirestore() {
+    try {
+      // // Intentar una operación simple de lectura
+      const testQuery = query(collection(db, 'invitations'), limit(1));
+      await getDocs(testQuery);
+      
+      if (dbStatus) {
+        dbStatus.textContent = '✅ Conexión a Firestore OK';
+        dbStatus.className = 'text-green-600';
+      }
+    } catch (error) {
+      console.error('Error conectando a Firestore:', error);
+      if (dbStatus) {
+        dbStatus.textContent = `❌ Error de Firestore: ${error}`;
+        dbStatus.className = 'text-red-600';
+      }
+    }
+  }
+
+  // // Cargar todas las invitaciones
+  async function loadInvitations() {
+    try {
+      if (invitationsList) {
+        invitationsList.innerHTML = '<p class="text-blue-600">Cargando invitaciones...</p>';
+      }
+
+      const q = query(
+        collection(db, 'invitations'),
+        orderBy('createdAt', 'desc'),
+        limit(20)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        if (invitationsList) {
+          invitationsList.innerHTML = '<p class="text-yellow-600">⚠️ No se encontraron invitaciones en la base de datos</p>';
+        }
+        return;
+      }
+
+      let html = `<p class="text-green-600 mb-4">✅ Encontradas ${querySnapshot.size} invitaciones:</p>`;
+      
+  querySnapshot.docs.forEach((doc, _index) => {
+        const data = doc.data();
+        html += `
+          <div class="border p-3 rounded mb-2">
+            <p><strong>📧 Email:</strong> ${data.inviteeEmail}</p>
+            <p><strong>🆔 ID:</strong> <code class="bg-gray-100 px-1 rounded text-xs">${doc.id}</code></p>
+            <p><strong>🏢 Workspace:</strong> ${data.workspaceId}</p>
+            <p><strong>📊 Estado:</strong> <span class="px-2 py-1 rounded text-xs ${data.status === 'sent' ? 'bg-green-100 text-green-800' : data.status === 'accepted' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}">${data.status}</span></p>
+            <p><strong>📅 Creado:</strong> ${data.createdAt?.toDate()?.toLocaleString() || 'N/A'}</p>
+            <div class="mt-2 space-x-2">
+              <a href="/accept-invitation/${doc.id}" 
+                 class="inline-block text-blue-600 underline text-sm hover:text-blue-800" 
+                 target="_blank">
+                 🚀 Abrir Invitación
+              </a>
+              <button onclick="navigator.clipboard.writeText('${window.location.origin}/accept-invitation/${doc.id}')" 
+                      class="text-gray-600 underline text-xs hover:text-gray-800">
+                📋 Copiar URL
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      if (invitationsList) {
+        invitationsList.innerHTML = html;
+      }
+
+    } catch (error) {
+      console.error('Error cargando invitaciones:', error);
+      if (invitationsList) {
+        invitationsList.innerHTML = `<p class="text-red-600">❌ Error: ${error}</p>`;
+      }
+    }
+  }
+
+  // // Crear invitación de prueba
+  async function createTestInvitation() {
+    try {
+      if (!currentUser) {
+        alert('Debes estar autenticado para crear una invitación');
+        return;
+      }
+
+      const email = (document.getElementById('test-email') as HTMLInputElement)?.value;
+      let workspaceId = (document.getElementById('test-workspace') as HTMLInputElement)?.value;
+      const message = (document.getElementById('test-message') as HTMLTextAreaElement)?.value;
+
+      if (!email) {
+        alert('Email es requerido');
+        return;
+      }
+
+      if (creationResult) {
+        creationResult.innerHTML = '<p class="text-blue-600">Procesando...</p>';
+      }
+
+      // // Si no hay workspace, crear uno automáticamente
+      if (!workspaceId || workspaceId.trim() === '') {
+        console.log('🏗️ Creando workspace automáticamente...');
+        const { createWorkspace } = await import('../firebase/api');
+        const workspaceResult = await createWorkspace('Workspace de Prueba', currentUser.uid);
+        
+        if (workspaceResult.success && workspaceResult.id) {
+          workspaceId = workspaceResult.id;
+          console.log('✅ Workspace creado:', workspaceId);
+          if (creationResult) {
+            creationResult.innerHTML = `<p class="text-blue-600">Workspace creado: ${workspaceId}. Creando invitación...</p>`;
+          }
+        } else {
+          throw new Error('No se pudo crear el workspace: ' + workspaceResult.error);
+        }
+      }
+
+      const result = await createInvitation(workspaceId, email, message);
+
+      if (result.success) {
+        if (creationResult) {
+          creationResult.innerHTML = `
+            <div class="bg-green-50 border border-green-200 rounded p-4">
+              <p class="text-green-800 font-semibold">✅ ¡Invitación creada exitosamente!</p>
+              <p class="text-sm mt-2"><strong>ID:</strong> ${result.invitationId}</p>
+              <p class="text-sm"><strong>Workspace:</strong> ${workspaceId}</p>
+              <p class="text-sm"><strong>Email enviado a:</strong> ${email}</p>
+              <div class="mt-3">
+                <a href="/accept-invitation/${result.invitationId}" 
+                   class="inline-block bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700" 
+                   target="_blank">
+                   🚀 Probar Invitación
+                </a>
+              </div>
+            </div>
+          `;
+        }
+        // // Recargar lista
+        loadInvitations();
+      } else {
+        if (creationResult) {
+          creationResult.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded p-4">
+              <p class="text-red-800">❌ Error: ${result.error}</p>
+            </div>
+          `;
+        }
+      }
+
+    } catch (error) {
+      console.error('Error creando invitación:', error);
+      if (creationResult) {
+        creationResult.innerHTML = `
+          <div class="bg-red-50 border border-red-200 rounded p-4">
+            <p class="text-red-800">❌ Error inesperado: ${error}</p>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // // Event listeners
+  loadInvitationsBtn?.addEventListener('click', loadInvitations);
+  createInvitationBtn?.addEventListener('click', createTestInvitation);
+
+  // // Inicialización
+  checkFirestore();
+</script>
+</Layout>

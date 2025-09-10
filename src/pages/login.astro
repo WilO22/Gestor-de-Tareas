@@ -10,6 +10,17 @@ import Layout from '../layouts/Layout.astro';
       </h1>
 
       <form id="auth-form" class="space-y-4">
+        <!-- NUEVO: Campo displayName para registro (oculto por defecto) -->
+        <div id="displayNameField" style="display: none;">
+          <label for="displayName" class="block mb-2 text-sm font-medium">Nombre completo</label>
+          <input 
+            type="text" 
+            id="displayName" 
+            class="w-full px-3 py-2 border rounded-lg" 
+            placeholder="Juan Pérez"
+          />
+        </div>
+        
         <div>
           <label for="email" class="block mb-2 text-sm font-medium">Correo Electrónico</label>
           <input 
@@ -32,11 +43,15 @@ import Layout from '../layouts/Layout.astro';
         </div>
         
         <div class="flex flex-col gap-2">
-          <button type="submit" id="login-button" class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+          <button type="button" id="login-button" class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
             Iniciar Sesión
           </button>
-          <button type="submit" id="register-button" class="w-full px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700">
+          <button type="button" id="register-button" class="w-full px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700">
             Registrarse
+          </button>
+          <!-- NUEVO: Botón para alternar entre login y registro -->
+          <button type="button" id="toggle-mode" class="w-full px-4 py-2 text-blue-600 bg-transparent border border-blue-600 rounded-lg hover:bg-blue-50">
+            ¿Ya tienes cuenta? Inicia sesión
           </button>
         </div>
       </form>
@@ -49,10 +64,45 @@ import Layout from '../layouts/Layout.astro';
   // OBTENEMOS los elementos
   const emailInput = document.getElementById('email') as HTMLInputElement;
   const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const displayNameInput = document.getElementById('displayName') as HTMLInputElement; // // NUEVO
+  const displayNameField = document.getElementById('displayNameField') as HTMLDivElement; // // NUEVO
   const loginButton = document.getElementById('login-button');
   const registerButton = document.getElementById('register-button');
+  const toggleModeButton = document.getElementById('toggle-mode'); // // NUEVO
   // AÑADIMOS la referencia al nuevo párrafo
   const feedbackMessage = document.getElementById('feedback-message');
+
+  // // NUEVO: Estado para alternar entre login y registro
+  let isRegistrationMode = false;
+
+  // // NUEVO: Función para alternar entre modos
+  function toggleMode() {
+    isRegistrationMode = !isRegistrationMode;
+    
+    if (isRegistrationMode) {
+      // // Mostrar modo registro
+      if (displayNameField) displayNameField.style.display = 'block';
+      if (loginButton) loginButton.style.display = 'none';
+      if (registerButton) registerButton.style.display = 'block';
+      if (toggleModeButton) toggleModeButton.textContent = '¿Ya tienes cuenta? Inicia sesión';
+      const h1 = document.querySelector('h1');
+      if (h1) h1.textContent = 'Crear cuenta';
+    } else {
+      // // Mostrar modo login
+      if (displayNameField) displayNameField.style.display = 'none';
+      if (loginButton) loginButton.style.display = 'block';
+      if (registerButton) registerButton.style.display = 'none';
+      if (toggleModeButton) toggleModeButton.textContent = '¿No tienes cuenta? Regístrate';
+      const h1 = document.querySelector('h1');
+      if (h1) h1.textContent = 'Iniciar Sesión';
+    }
+    
+    // // Limpiar mensajes
+    if (feedbackMessage) feedbackMessage.textContent = '';
+  }
+
+  // // NUEVO: Event listener para alternar modo
+  toggleModeButton?.addEventListener('click', toggleMode);
 
   // Listener para el botón de INICIAR SESIÓN
   loginButton?.addEventListener('click', async (event) => {
@@ -74,13 +124,15 @@ import Layout from '../layouts/Layout.astro';
     }
   });
 
-  // Listener para el botón de REGISTRARSE
+  // Listener para el botón de REGISTRARSE - ACTUALIZADO para incluir displayName
   registerButton?.addEventListener('click', async (event) => {
     event.preventDefault();
     
     if (feedbackMessage) feedbackMessage.textContent = '';
     
-    const result = await signUp(emailInput.value, passwordInput.value);
+    // // NUEVO: Incluir displayName en el registro
+    const displayName = displayNameInput.value.trim() || undefined;
+    const result = await signUp(emailInput.value, passwordInput.value, displayName);
 
     if (result.success) {
       // Si el registro es exitoso, mostramos un mensaje en verde
@@ -99,6 +151,15 @@ import Layout from '../layouts/Layout.astro';
         feedbackMessage.style.color = 'red';
       }
     }
+  });
+
+  // // NUEVO: Inicializar en modo login por defecto
+  document.addEventListener('DOMContentLoaded', () => {
+    // // Configurar estado inicial (modo login)
+    if (displayNameField) displayNameField.style.display = 'none';
+    if (loginButton) loginButton.style.display = 'block';
+    if (registerButton) registerButton.style.display = 'none';
+    if (toggleModeButton) toggleModeButton.textContent = '¿No tienes cuenta? Regístrate';
   });
 </script>
 </Layout>

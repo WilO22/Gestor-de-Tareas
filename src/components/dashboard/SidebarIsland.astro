@@ -1,0 +1,36 @@
+---
+// Sidebar server frontmatter
+const userWorkspaces: any[] = [];
+let error: any = null;
+
+void userWorkspaces;
+void error;
+---
+
+<aside class="w-64 bg-trello-gray border-r border-gray-300 flex flex-col" data-island="sidebar">
+  <div class="px-4 py-2">
+          <h3 class="text-xs font-semibold text-gray-400 uppercase mb-2">
+            Espacios de trabajo
+          </h3>
+          {/*
+            Reemplazado el bloque de ejemplo por el contenedor dinámico.
+            El script sidebar-island.ts renderiza aquí los workspaces reales con el diseño correcto.
+            El resto del diseño y estructura se mantiene igual.
+          */}
+          <div id="workspaces-list" class="space-y-1"></div>
+        </div>
+      </aside>
+
+<!-- Client initializer: import the client-side TypeScript module that sets up event listeners and subscriptions. -->
+<script type="module" is:inline>
+  // Import and initialize the client-side island initializer. Vite will bundle this module.
+  import initSidebarIsland from '/src/scripts/sidebar-island.ts';
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initSidebarIsland());
+  } else {
+  initSidebarIsland();
+  }
+</script>
+ 

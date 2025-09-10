@@ -1,0 +1,155 @@
+---
+// src/components/layout/Grid.astro
+// Sistema de grid responsive reutilizable
+
+export interface Props {
+  // Configuración del grid
+  cols?: number | { xs?: number; sm?: number; md?: number; lg?: number; xl?: number; '2xl'?: number };
+  rows?: number | { xs?: number; sm?: number; md?: number; lg?: number; xl?: number; '2xl'?: number };
+  
+  // Espaciado
+  gap?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  gapX?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  gapY?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  
+  // Alineación
+  align?: 'start' | 'center' | 'end' | 'stretch';
+  justify?: 'start' | 'center' | 'end' | 'between' | 'around' | 'evenly';
+  
+  // Auto-fit y auto-fill
+  autoFit?: boolean;
+  autoFill?: boolean;
+  minWidth?: string;
+  maxWidth?: string;
+  
+  // Tema
+  theme?: 'light' | 'dark' | 'auto';
+  
+  // Clases adicionales
+  class?: string;
+}
+
+const {
+  cols = 1,
+  rows,
+  gap = 'md',
+  gapX,
+  gapY,
+  align = 'stretch',
+  justify = 'start',
+  autoFit = false,
+  autoFill = false,
+  minWidth = '250px',
+  maxWidth,
+  theme = 'auto',
+  class: additionalClasses = ''
+} = Astro.props;
+
+// Referencia para silenciar hint si maxWidth no se usa en algunos casos
+void maxWidth;
+
+// Función para generar clases responsive
+function generateResponsiveClasses(prop: any, prefix: string): string {
+  if (typeof prop === 'number') {
+    return `${prefix}-${prop}`;
+  }
+  
+  if (typeof prop === 'object') {
+    return Object.entries(prop)
+      .map(([breakpoint, value]) => {
+        if (breakpoint === 'xs') return `${prefix}-${value}`;
+        return `${breakpoint}:${prefix}-${value}`;
+      })
+      .join(' ');
+  }
+  
+  return '';
+}
+
+// Clases base
+const baseClasses = [
+  'grid w-full'
+];
+
+// Columnas
+let colsClasses = '';
+if (autoFit) {
+  colsClasses = `grid-cols-[repeat(auto-fit,minmax(${minWidth},1fr))]`;
+} else if (autoFill) {
+  colsClasses = `grid-cols-[repeat(auto-fill,minmax(${minWidth},1fr))]`;
+} else {
+  colsClasses = generateResponsiveClasses(cols, 'grid-cols');
+}
+
+// Filas
+const rowsClasses = rows ? generateResponsiveClasses(rows, 'grid-rows') : '';
+
+// Espaciado
+const gapClasses = {
+  none: 'gap-0',
+  xs: 'gap-1',
+  sm: 'gap-2',
+  md: 'gap-4',
+  lg: 'gap-6',
+  xl: 'gap-8'
+};
+
+const gapXClasses = gapX ? {
+  none: 'gap-x-0',
+  xs: 'gap-x-1',
+  sm: 'gap-x-2',
+  md: 'gap-x-4',
+  lg: 'gap-x-6',
+  xl: 'gap-x-8'
+}[gapX] : '';
+
+const gapYClasses = gapY ? {
+  none: 'gap-y-0',
+  xs: 'gap-y-1',
+  sm: 'gap-y-2',
+  md: 'gap-y-4',
+  lg: 'gap-y-6',
+  xl: 'gap-y-8'
+}[gapY] : '';
+
+// Alineación
+const alignClasses = {
+  start: 'items-start',
+  center: 'items-center',
+  end: 'items-end',
+  stretch: 'items-stretch'
+};
+
+const justifyClasses = {
+  start: 'justify-items-start',
+  center: 'justify-items-center',
+  end: 'justify-items-end',
+  between: 'justify-items-between',
+  around: 'justify-items-around',
+  evenly: 'justify-items-evenly'
+};
+
+// Tema
+const themeClasses = {
+  light: '',
+  dark: 'dark',
+  auto: ''
+};
+
+// Clases finales
+const finalClasses = [
+  ...baseClasses,
+  colsClasses,
+  rowsClasses,
+  gapX ? gapXClasses : gapClasses[gap],
+  gapY ? gapYClasses : '',
+  alignClasses[align],
+  justifyClasses[justify],
+  themeClasses[theme],
+  additionalClasses
+].filter(Boolean).join(' ');
+---
+
+<div class={finalClasses}>
+  <slot />
+</div>

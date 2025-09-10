@@ -12,7 +12,9 @@
       >
         <span class="text-white font-bold text-sm">D</span>
       </div>
-      <span class="text-blue font-semibold text-lg">DashUp</span>
+      <a href="/dashboard">
+        <span class="text-blue font-semibold text-lg">DashUp</span>
+      </a>
     </div>
   </div>
 
@@ -40,12 +42,7 @@
   </div>
 
   <div class="flex items-center space-x-3">
-    <button
-      id="create-workspace-btn"
-      class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium transition-colors"
-    >
-      Crear
-    </button>
+    <!-- Botón de crear removido - usar el del dashboard principal -->
     <div class="flex items-center space-x-2">
       <button class="p-2 hover:bg-gray-100 rounded">
         <!-- Icono de notificaciones -->
@@ -62,7 +59,7 @@
           id="userMenuBtn"
           class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center font-bold text-sm text-black hover:bg-yellow-400 transition-colors cursor-pointer"
         >
-          YR
+          <span id="userAvatarButton">YR</span>
         </button>
         
         <div
@@ -72,26 +69,21 @@
           <div class="p-4 border-b">
             <div class="flex items-center space-x-3">
               <div
+                id="userAvatarMenu"
                 class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center font-bold"
               >
                 YR
               </div>
               <div>
-                <div class="font-semibold">Yaqui Raquel</div>
-                <div class="text-sm text-gray-600">
-                  yaquita2014@gmail.com
+                <div id="userDisplayName" class="font-semibold">Cargando...</div>
+                <div id="userEmail" class="text-sm text-gray-600">
+                  Cargando...
                 </div>
               </div>
             </div>
           </div>
-          <div class="py-2">
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100"
-              >Cambiar cuentas</a
-            >
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100"
-              >Gestionar cuenta</a
-            >
-          </div>
+          
+          <!-- // Sección DASHUP simplificada (igual que imagen 2) -->
           <div class="border-t py-2">
             <div
               class="px-4 py-1 text-xs font-semibold text-gray-500 uppercase"
@@ -102,16 +94,11 @@
               >Perfil y visibilidad</a
             >
             <a href="#" class="block px-4 py-2 hover:bg-gray-100"
-              >Actividad</a
-            >
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100"
               >Tarjetas</a
             >
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100"
-              >Ajustes</a
-            >
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Tema</a>
           </div>
+          
+          <!-- // Crear Espacio de trabajo (mantenido) -->
           <div class="border-t py-2">
             <button
               id="create-workspace-menu-btn"
@@ -133,12 +120,8 @@
               Crear Espacio de trabajo
             </button>
           </div>
-          <div class="border-t py-2">
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Ayuda</a>
-            <a href="#" class="block px-4 py-2 hover:bg-gray-100"
-              >Accesos directos</a
-            >
-          </div>
+          
+          <!-- // Cerrar sesión (mantenido) -->
           <div class="border-t py-2">
             <button
               id="logout-btn"
@@ -154,14 +137,18 @@
 </header>
 
 <!-- Modal para crear workspace -->
-<div id="create-workspace-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
-  <div class="flex items-center justify-center h-full">
+<div id="create-workspace-modal" class="fixed inset-0 z-50" style="display: none;">
+  <!-- // Overlay con efecto de desenfoque y oscurecimiento -->
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+  
+  <!-- // Contenedor del modal centrado -->
+  <div class="relative flex items-center justify-center h-full">
     <div class="bg-white rounded-lg p-6 w-96">
       <h3 class="text-lg font-semibold mb-4">Crear nuevo espacio de trabajo</h3>
       <form id="workspace-form">
         <input 
           type="text" 
-          id="workspace-name-input" 
+          id="create-workspace-name-input" 
           placeholder="Nombre del espacio de trabajo" 
           class="w-full px-3 py-2 border rounded-lg mb-4" 
           required
@@ -183,16 +170,81 @@
   import { signOut } from 'firebase/auth';
   import { auth } from '../../firebase/auth';
   import { createWorkspace } from '../../firebase/api';
+  // // ELIMINADO: import { getUserProfile } from '../../firebase/users'; - No es necesario
+
+  // // Función para generar iniciales desde un nombre o email
+  function generateInitials(name: string, email: string): string {
+    if (name && name.trim()) {
+      // // Si hay displayName, usar sus iniciales
+      const nameParts = name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        return (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+      } else {
+        return name.substring(0, 2).toUpperCase();
+      }
+    } else {
+      // // Si no hay displayName, usar iniciales del email
+      const emailPrefix = email.split('@')[0];
+      if (emailPrefix.length >= 2) {
+        return (emailPrefix[0] + emailPrefix[1]).toUpperCase();
+      } else {
+        return emailPrefix.toUpperCase();
+      }
+    }
+  }
+
+  // // Función para actualizar la información del usuario en el menú
+  async function updateUserInfo() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      // // SIMPLIFICADO: Usar directamente la información de Firebase Auth
+      const displayName = user.displayName || '';
+      const email = user.email || '';
+      
+      // // Generar iniciales
+      const initials = generateInitials(displayName, email);
+      
+      // // Actualizar avatar button
+      const avatarButton = document.getElementById('userAvatarButton');
+      if (avatarButton) {
+        avatarButton.textContent = initials;
+      }
+      
+      // // Actualizar avatar en el menú
+      const avatarMenu = document.getElementById('userAvatarMenu');
+      if (avatarMenu) {
+        avatarMenu.textContent = initials;
+      }
+      
+      // // Actualizar nombre en el menú
+      const displayNameElement = document.getElementById('userDisplayName');
+      if (displayNameElement) {
+        displayNameElement.textContent = displayName || email.split('@')[0];
+      }
+      
+      // // Actualizar email en el menú
+      const emailElement = document.getElementById('userEmail');
+      if (emailElement) {
+        emailElement.textContent = email;
+      }
+      
+      console.log('✅ Información de usuario actualizada desde Firebase Auth:', { displayName, email, initials });
+    } catch (error) {
+      console.error('❌ Error actualizando información de usuario:', error);
+    }
+  }
 
   // Elementos del DOM
   const userMenuBtn = document.getElementById('userMenuBtn');
   const userMenu = document.getElementById('userMenu');
   const logoutBtn = document.getElementById('logout-btn');
-  const createWorkspaceBtn = document.getElementById('create-workspace-btn');
+  const createWorkspaceBtn = document.getElementById('header-create-workspace-btn');
   const createWorkspaceMenuBtn = document.getElementById('create-workspace-menu-btn');
   const createWorkspaceModal = document.getElementById('create-workspace-modal');
   const workspaceForm = document.getElementById('workspace-form');
-  const workspaceNameInput = document.getElementById('workspace-name-input') as HTMLInputElement;
+  const workspaceNameInput = document.getElementById('create-workspace-name-input') as HTMLInputElement;
   const cancelModal = document.getElementById('cancel-modal');
 
   // Funcionalidad del menú de usuario
@@ -286,4 +338,24 @@
       }
     });
   }
+
+  // // Actualizar información del usuario cuando se carga el componente
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔄 DashBoardHeader cargado, actualizando info de usuario...');
+    
+    // // Escuchar cambios en el estado de autenticación
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        console.log('👤 Usuario autenticado, actualizando información...');
+        await updateUserInfo();
+      } else {
+        console.log('❌ Usuario no autenticado');
+      }
+    });
+    
+    // // También actualizar inmediatamente si ya hay un usuario
+    if (auth.currentUser) {
+      updateUserInfo();
+    }
+  });
 </script>
