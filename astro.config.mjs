@@ -18,8 +18,14 @@ export default defineConfig({
     plugins: [tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src')
+        '@': path.resolve(__dirname, 'src'),
+        'firebase/app': 'firebase/app',
+        'firebase/auth': 'firebase/auth',
+        'firebase/firestore': 'firebase/firestore'
       }
+    },
+    optimizeDeps: {
+      include: ['firebase/app', 'firebase/auth', 'firebase/firestore', './src/firebase/client-config.ts']
     }
   }
 });

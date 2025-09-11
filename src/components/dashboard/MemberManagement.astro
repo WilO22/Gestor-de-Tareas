@@ -62,8 +62,8 @@ void workspaceId;
 
 <script>
   // // SCRIPT MODULAR: Solo funciones relacionadas con gestión de miembros
-  import { getDoc, doc } from 'firebase/firestore';
-  import { db } from '../../firebase/client';
+  import { getDoc, doc } from '../../firebase/client-config';
+  import { db } from '../../firebase/client-config';
   import { getWorkspaceInvitations, cancelInvitation } from '../../firebase/invitations';
   import type { Member, Invitation } from '../../types/domain';
 

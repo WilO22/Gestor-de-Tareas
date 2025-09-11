@@ -23,7 +23,7 @@ const { workspaceId, boardId } = Astro.params;
     {/* Cabecera del board con buscador y opciones (similar a Trello) */}
     <BoardHeader />
 
-    {/* Contenedor de columnas. Se llena desde /src/scripts/board-page.ts */}
+    {/* Contenedor de columnas. Se llena desde /src/scripts/board/board-page.ts */}
     <div class="px-8">
       <div id="columns-container">
         <p class="text-gray-600">Cargando columnas...</p>
@@ -33,7 +33,7 @@ const { workspaceId, boardId } = Astro.params;
   
   {/* Inicializamos la lógica de cliente con los IDs de la ruta */}
   <!-- Script procesado: inicializador de BoardPage; IDs se leen desde data attrs del root -->
-  <script src="/src/scripts/board-page.ts"></script>
+  <script src="../../../scripts/board/board-page.ts"></script>
 
   <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
     se generan dinámicamente en el cliente y no reciben el atributo de

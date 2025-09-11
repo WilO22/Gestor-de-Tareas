@@ -69,11 +69,11 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { auth } from '../firebase/auth';
-  import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
-  import { db } from '../firebase/client';
-  import { onAuthStateChanged } from 'firebase/auth';
+  import { auth, onAuthStateChanged } from '../firebase/auth';
+  import { collection, getDocs, query, limit, orderBy } from '../firebase/client-config';
+  import { db } from '../firebase/client-config';
   import { createInvitation } from '../firebase/invitations';
+  import { createWorkspace } from '../firebase/api';
 
   let currentUser: any = null;
 
@@ -200,7 +200,6 @@ import Layout from '../layouts/Layout.astro';
       // // Si no hay workspace, crear uno automáticamente
       if (!workspaceId || workspaceId.trim() === '') {
         console.log('🏗️ Creando workspace automáticamente...');
-        const { createWorkspace } = await import('../firebase/api');
         const workspaceResult = await createWorkspace('Workspace de Prueba', currentUser.uid);
         
         if (workspaceResult.success && workspaceResult.id) {

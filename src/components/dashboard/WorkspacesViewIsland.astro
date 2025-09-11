@@ -3,7 +3,6 @@
 // Server Island para vista de workspaces - renderiza lista de workspaces del usuario
 
 import WorkspaceCard from '../workspace/WorkspaceCard.astro';
-import CreateWorkspaceCard from './CreateWorkspaceCard.astro';
 import CreateWorkspaceModal from './CreateWorkspaceModal.astro';
 void WorkspaceCard;
 
@@ -14,7 +13,6 @@ const serverWorkspaces: any[] = [];
 ---
 
 <div id="workspaces-view" class="workspaces-view-island w-full bg-transparent" data-island="workspaces-view">
-  <CreateWorkspaceModal id="create-workspace-modal" />
   <div class="w-full px-6 md:px-12 xl:px-24 2xl:px-40">
     <!-- Header de la vista -->
     <div class="mb-12 pt-8">
@@ -32,10 +30,7 @@ const serverWorkspaces: any[] = [];
     </div>
     <!-- Grid de workspaces (se oculta si loading) -->
     <div id="workspaces-grid" class="grid gap-12 w-full grid-cols-[repeat(auto-fit,minmax(260px,1fr))]" style="display:none">
-      <div>
-        <CreateWorkspaceCard />
-      </div>
-      <!-- Las tarjetas de workspaces reales se renderizan dinámicamente desde el script del island -->
+      <!-- Las tarjetas de workspaces se renderizan dinámicamente desde el script del island -->
     </div>
   </div>
   
@@ -89,28 +84,26 @@ const serverWorkspaces: any[] = [];
 </div>
 
 <script>
-  // Listener para la tarjeta de crear workspace (estática)
-  function setupCreateWorkspaceCardListener() {
-    const card = document.getElementById('create-workspace-card');
-    if (card) {
-      card.addEventListener('click', () => {
-        document.dispatchEvent(new CustomEvent('create-workspace-requested'));
-      });
-      card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          document.dispatchEvent(new CustomEvent('create-workspace-requested'));
-        }
-      });
-    }
-  }
-  setupCreateWorkspaceCardListener();
   // Script hidratado para funcionalidad interactiva
-  import { onAuthStateChanged } from 'firebase/auth';
-  import { auth } from '../../firebase/auth';
+  import { onAuthStateChanged, getAuth } from 'firebase/auth';
   import { subscribeToUserWorkspaces } from '../../firebase/api';
   import type { Workspace } from '../../types/domain';
   import type { Unsubscribe } from 'firebase/firestore';
   import { formatRelativeTime } from '../../utils/date.utils';
+  import { app } from '../../firebase/client';
+
+  console.log('🏝️ WorkspacesViewIsland: Hidratando en cliente');
+
+  // Inicializar auth con la app
+  const auth = getAuth(app);
+
+  // Verificar que Firebase esté disponible
+  try {
+    console.log('🏝️ WorkspacesViewIsland: Verificando Firebase auth:', !!auth);
+    console.log('🏝️ WorkspacesViewIsland: Verificando Firebase app:', !!app);
+  } catch (error) {
+    console.error('🏝️ WorkspacesViewIsland: Error al verificar Firebase:', error);
+  }
 
   console.log('🏝️ WorkspacesViewIsland: Hidratando en cliente');
 
@@ -131,54 +124,84 @@ const serverWorkspaces: any[] = [];
 
   let workspacesUnsubscribe: Unsubscribe | null = null;
 
-  // Elementos del DOM
-  const elements = {
-    grid: document.getElementById('workspaces-grid'),
-    loadingState: document.getElementById('loading-state'),
-    emptyState: document.getElementById('empty-state'),
-    errorState: document.getElementById('error-state'),
-    errorMessage: document.getElementById('error-message'),
-    retryBtn: document.getElementById('retry-btn'),
-    createBtn: document.getElementById('create-workspace-btn-main')
-  };
+  // Función para obtener elementos del DOM (dinámicamente)
+  function getElements() {
+    const grid = document.getElementById('workspaces-grid');
+    const loadingState = document.getElementById('loading-state');
+    const emptyState = document.getElementById('empty-state');
 
-  // Mostrar/ocultar loading y grid según el estado
+    console.log('🏝️ WorkspacesViewIsland: getElements called:', {
+      grid: !!grid,
+      loadingState: !!loadingState,
+      emptyState: !!emptyState,
+      gridId: grid?.id
+    });
+
+    return {
+      grid,
+      loadingState,
+      emptyState
+    };
+  }
+
+  // Función para actualizar visibilidad
   function updateVisibility() {
+    const elements = getElements();
     if (state.loading) {
       elements.loadingState?.removeAttribute('style');
       elements.grid?.setAttribute('style', 'display:none');
+      elements.emptyState?.classList.add('hidden');
     } else {
       elements.loadingState?.setAttribute('style', 'display:none');
       elements.grid?.removeAttribute('style');
+      if (state.workspaces.length === 0) {
+        elements.emptyState?.classList.remove('hidden');
+      } else {
+        elements.emptyState?.classList.add('hidden');
+      }
     }
   }
 
   // Función para renderizar workspaces
   function renderWorkspaces(workspaces: Workspace[]) {
-    if (!elements.grid) return;
+    let elements = getElements();
+    console.log('🏝️ WorkspacesViewIsland: Elementos encontrados:', {
+      grid: !!elements.grid,
+      gridId: elements.grid?.id,
+      gridChildren: elements.grid?.children?.length
+    });
+
+    if (!elements.grid) {
+      console.error('🏝️ WorkspacesViewIsland: Grid element not found');
+      return;
+    }
 
     state.loading = false;
     updateVisibility();
 
     console.log('🏝️ WorkspacesViewIsland: Renderizando', workspaces.length, 'workspaces');
 
-    // Ocultar estados
-    hideAllStates();
+    // HTML de la tarjeta de crear workspace (siempre al inicio)
+    const createCardHTML = `
+      <div>
+        <div id="create-workspace-card" class="workspace-card-container cursor-pointer p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-lg hover:border-blue-300 hover:bg-gradient-to-br hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 group" role="button" tabindex="0">
+          <div class="flex flex-col items-center justify-center space-y-4 h-full min-h-[200px]">
+            <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-200">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+            </div>
+            <div class="text-center">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Crear Workspace</h3>
+              <p class="text-sm text-gray-600">Organiza tus proyectos y colabora con tu equipo</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
 
-    if (workspaces.length === 0) {
-      elements.emptyState?.classList.remove('hidden');
-      return;
-    }
-
-  // Solo renderizar workspaces, la tarjeta de crear workspace ya está en el grid estático
-  // Siempre renderiza la tarjeta de crear workspace al inicio
-  let workspacesHTML = '';
-  const staticCard = document.querySelector('#workspaces-grid > div');
-  if (staticCard) {
-    workspacesHTML += staticCard.outerHTML;
-  }
-  workspacesHTML += workspaces.map(workspace => {
-      // ...código de render de workspace (igual que antes)...
+    // Renderizar workspaces
+    const workspacesHTML = workspaces.map(workspace => {
       const memberCount = workspace.members?.length || 0;
       const boardCount = workspace.boards?.length || 0;
       const lastActivity = workspace.updatedAt ? new Date(workspace.updatedAt) : null;
@@ -186,6 +209,7 @@ const serverWorkspaces: any[] = [];
       const colors = ['blue', 'green', 'purple', 'pink', 'indigo'];
       const colorIndex = workspace.id.charCodeAt(0) % colors.length;
       const color = colors[colorIndex];
+
       return `
         <div class="workspace-card-container" data-workspace-id="${workspace.id}">
           <a href="/workspace/${workspace.id}/boards" class="block p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200">
@@ -195,13 +219,9 @@ const serverWorkspaces: any[] = [];
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-semibold text-gray-900 truncate">${workspace.name}</h3>
-                ${workspace.description ? `<p class="text-sm text-gray-600 truncate">${workspace.description}</p>` : ''}
               </div>
               ${isOwner ? `
                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
-                  </svg>
                   Propietario
                 </span>
               ` : ''}
@@ -229,73 +249,62 @@ const serverWorkspaces: any[] = [];
                   ${lastActivity ? `Actualizado ${formatRelativeTime(lastActivity)}` : 'Sin actividad reciente'}
                 </span>
               </div>
-              <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                </svg>
-              </div>
             </div>
           </a>
         </div>
       `;
     }).join('');
 
+    // Actualizar el grid con la tarjeta de crear + workspaces
+    elements.grid.innerHTML = createCardHTML + workspacesHTML;
 
-  // Actualizar el grid
-  elements.grid.innerHTML = workspacesHTML;
-  // Reasignar listener a la tarjeta después de cada render
-  setupCreateWorkspaceCardListener();
+    // Configurar listener para la tarjeta de crear workspace
+    setupCreateWorkspaceCardListener();
+  }
 
+  // Función para configurar el listener de la tarjeta de crear workspace
+  function setupCreateWorkspaceCardListener() {
+    const createCard = document.getElementById('create-workspace-card');
+    if (createCard) {
+      console.log('🏝️ WorkspacesViewIsland: Create workspace card found, adding listener');
 
-    // ...resto del código de SPA click handlers...
-    try {
-      if (elements.grid) {
-        elements.grid.querySelectorAll('.workspace-card-container a').forEach(a => {
-          // // remover listeners previos si existen
-          (a as any)._wsClickAttached && a.removeEventListener('click', (a as any)._wsClickFn);
-          const fn = (e: Event) => {
-            e.preventDefault(); // // prevenir navegación por href
-            e.stopPropagation();
-            const container = (a as HTMLElement).closest('.workspace-card-container') as HTMLElement | null;
-            const wid = container?.dataset.workspaceId;
-            if (!wid) {
-              // // fallback: seguir el href original
-              window.location.href = (a as HTMLAnchorElement).href;
-              return;
-            }
-
-            const showBoardsView = (window as any).showBoardsView;
-            if (typeof showBoardsView === 'function') {
-              // // Llamada SPA para renderizar tableros en el main
-              try { showBoardsView(wid); } catch (err) { console.error('Error calling showBoardsView', err); window.location.href = `/workspace/${wid}/boards`; }
-            } else {
-              // // Si no existe la API SPA, navegar a la ruta de tableros
-              window.location.href = `/workspace/${wid}/boards`;
-            }
-          };
-          a.addEventListener('click', fn);
-          (a as any)._wsClickAttached = true;
-          (a as any)._wsClickFn = fn;
-        });
+      // Remover listener anterior si existe
+      if ((createCard as any)._createClickAttached) {
+        createCard.removeEventListener('click', (createCard as any)._createClickFn);
+        createCard.removeEventListener('keydown', (createCard as any)._createKeydownFn);
       }
-    } catch (e) {
-      console.error('WorkspacesViewIsland: error attaching SPA click handlers', e);
-    }
-  }
 
-  // Función para ocultar todos los estados
-  function hideAllStates() {
-    elements.loadingState?.classList.add('hidden');
-    elements.emptyState?.classList.add('hidden');
-    elements.errorState?.classList.add('hidden');
-  }
+        // Agregar nuevo listener para click
+        const clickFn = (e: Event) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🏝️ WorkspacesViewIsland: Click en crear workspace');
 
-  // Función para mostrar estado de error
-  function showError(message: string) {
-    hideAllStates();
-    elements.errorState?.classList.remove('hidden');
-    if (elements.errorMessage) {
-      elements.errorMessage.textContent = message;
+          // Disparar evento personalizado para abrir el modal
+          const event = new CustomEvent('create-workspace-requested');
+          document.dispatchEvent(event);
+        };
+
+        // Agregar nuevo listener para teclado (Enter y Space)
+        const keydownFn = (e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🏝️ WorkspacesViewIsland: Keydown en crear workspace');
+
+            // Disparar evento personalizado para abrir el modal
+            const event = new CustomEvent('create-workspace-requested');
+            document.dispatchEvent(event);
+          }
+        };      createCard.addEventListener('click', clickFn);
+      createCard.addEventListener('keydown', keydownFn);
+
+      (createCard as any)._createClickAttached = true;
+      (createCard as any)._createClickFn = clickFn;
+      (createCard as any)._createKeydownFn = keydownFn;
+    } else {
+      console.log('🏝️ WorkspacesViewIsland: Create workspace card not found, will retry in 1 second');
+      setTimeout(setupCreateWorkspaceCardListener, 1000);
     }
   }
 
@@ -320,34 +329,23 @@ const serverWorkspaces: any[] = [];
       // Suscribirse a workspaces del usuario
       workspacesUnsubscribe = subscribeToUserWorkspaces(user.uid, (workspaces) => {
         console.log('🏝️ WorkspacesViewIsland: Workspaces actualizados:', workspaces);
-        
+        console.log('🏝️ WorkspacesViewIsland: Número de workspaces:', workspaces.length);
+        console.log('🏝️ WorkspacesViewIsland: Último workspace:', workspaces[workspaces.length - 1]);
+
         state.workspaces = workspaces;
         state.loading = false;
         state.error = null;
-        
+
+        console.log('🏝️ WorkspacesViewIsland: Llamando renderWorkspaces...');
         renderWorkspaces(workspaces);
+        console.log('🏝️ WorkspacesViewIsland: renderWorkspaces completado');
       });
     } catch (error) {
       console.error('🏝️ WorkspacesViewIsland: Error cargando workspaces:', error);
       state.loading = false;
       state.error = 'Error al cargar los workspaces';
-      showError('Error al cargar los workspaces');
-    }
-  }
-
-  // Handler para crear workspace
-  function handleCreateWorkspace() {
-  // El modal se abre globalmente por el listener en CreateWorkspaceModal.astro
-  // Ya no se dispara aquí, solo desde el listener de la tarjeta
-  }
-
-  // Handler para reintentar
-  function handleRetry() {
-    if (state.user) {
-      state.loading = true;
-      elements.loadingState?.classList.remove('hidden');
-      hideAllStates();
-      setTimeout(() => loadWorkspaces(state.user), 500);
+      state.workspaces = [];
+      renderWorkspaces([]);
     }
   }
 
@@ -359,38 +357,32 @@ const serverWorkspaces: any[] = [];
     state.loading = true;
     updateVisibility();
 
-    // Event listeners
-    elements.createBtn?.addEventListener('click', handleCreateWorkspace);
-    elements.retryBtn?.addEventListener('click', handleRetry);
-    
-    // También escuchar clicks en botones de crear del estado vacío
-    document.querySelectorAll('.create-workspace-btn').forEach(btn => {
-      btn.addEventListener('click', handleCreateWorkspace);
-    });
+    // Configurar listener de la tarjeta de crear workspace
+    console.log('🏝️ WorkspacesViewIsland: Configurando listener para crear workspace...');
+    setupCreateWorkspaceCardListener();
 
     // Suscribirse a cambios de autenticación
-    onAuthStateChanged(auth, (user) => {
-      state.user = user;
-      state.loading = true;
-      updateVisibility();
-      if (user) {
-        console.log('🏝️ WorkspacesViewIsland: Usuario autenticado');
-        loadWorkspaces(user);
-      } else {
-        console.log('🏝️ WorkspacesViewIsland: Usuario no autenticado');
-        state.workspaces = [];
-        state.loading = false;
+    try {
+      onAuthStateChanged(auth, (user) => {
+        state.user = user;
+        state.loading = true;
         updateVisibility();
-        renderWorkspaces([]);
-      }
-    });
-  }
-
-  // Cleanup
-  function cleanupWorkspacesViewIsland() {
-    if (workspacesUnsubscribe) {
-      workspacesUnsubscribe();
-      workspacesUnsubscribe = null;
+        if (user) {
+          console.log('🏝️ WorkspacesViewIsland: Usuario autenticado');
+          loadWorkspaces(user);
+        } else {
+          console.log('🏝️ WorkspacesViewIsland: Usuario no autenticado');
+          state.workspaces = [];
+          state.loading = false;
+          updateVisibility();
+          renderWorkspaces([]);
+        }
+      });
+    } catch (error) {
+      console.error('🏝️ WorkspacesViewIsland: Error en autenticación:', error);
+      state.loading = false;
+      state.workspaces = [];
+      renderWorkspaces([]);
     }
   }
 
@@ -401,16 +393,7 @@ const serverWorkspaces: any[] = [];
     initializeWorkspacesViewIsland();
   }
 
-  // Cleanup en beforeunload
-  window.addEventListener('beforeunload', cleanupWorkspacesViewIsland);
-
-  // API pública para debugging
-  (window as any).workspacesViewIsland = {
-    state: () => state,
-    loadWorkspaces,
-    renderWorkspaces,
-    cleanup: cleanupWorkspacesViewIsland
-  };
+  console.log('🏝️ WorkspacesViewIsland: Script loaded completely');
 </script>
 
 <style>

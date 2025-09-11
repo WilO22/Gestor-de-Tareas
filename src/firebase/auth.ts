@@ -1,11 +1,12 @@
 // src/firebase/auth.ts
 
 // 1. Importamos las herramientas que necesitamos
-import { 
+import {
   getAuth, // El servicio de autenticación
   createUserWithEmailAndPassword, // La función para crear nuevos usuarios
   signInWithEmailAndPassword,
-  updateProfile // Para actualizar el perfil del usuario
+  updateProfile, // Para actualizar el perfil del usuario
+  onAuthStateChanged // Para escuchar cambios en el estado de autenticación
 } from "firebase/auth";
 
 // Importamos la 'app' que ya inicializamos en nuestro otro archivo de firebase
@@ -72,3 +73,6 @@ export async function signIn(email: string, password: string) {
     return { success: false, error: "Ocurrió un error desconocido" };
   }
 }
+
+// Re-exportar onAuthStateChanged para uso en componentes del cliente
+export { onAuthStateChanged, getAuth };

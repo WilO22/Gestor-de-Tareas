@@ -121,10 +121,9 @@ if (!invitationId) {
 </Layout>
 
 <script>
-  import { auth } from '../../firebase/auth';
-  import { doc, getDoc, updateDoc, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
-  import { db } from '../../firebase/client';
-  import { onAuthStateChanged } from 'firebase/auth';
+  import { auth, onAuthStateChanged } from '../../firebase/auth';
+  import { doc, getDoc, updateDoc, collection, addDoc, getDocs, query, limit } from '../../firebase/client-config';
+  import { db } from '../../firebase/client-config';
   import type { Invitation } from '../../types/domain';
 
   // // Obtener el ID de la invitación desde la URL

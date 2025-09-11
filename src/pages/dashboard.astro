@@ -4,6 +4,7 @@ import DashboardHeader from "../components/dashboard/DashBoardHeader.astro";
 import SidebarIsland from "../components/dashboard/SidebarIsland.astro";
 import WorkspacesViewIsland from "../components/dashboard/WorkspacesViewIsland.astro";
 import MembersManagementIsland from "../components/dashboard/MembersManagementIsland.astro";
+import CreateWorkspaceModal from "../components/dashboard/CreateWorkspaceModal.astro";
 ---
 
 
@@ -21,5 +22,7 @@ import MembersManagementIsland from "../components/dashboard/MembersManagementIs
         </div>
       </main>
     </div>
+    <!-- Modal para crear workspace - debe estar disponible globalmente -->
+    <CreateWorkspaceModal />
   </div>
 </Layout>

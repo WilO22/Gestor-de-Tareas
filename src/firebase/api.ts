@@ -4,6 +4,8 @@ import { db } from './client';
 import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, writeBatch } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 import type { Column, Task, Board, Workspace, Member, User } from '../types/domain';
+import { auth } from './auth';
+import { findUserByEmail } from './users';
 // // ELIMINADO: import { updateUserWorkspaces } from './users'; - ya no es necesario
 
 // ============================================================================
@@ -77,12 +79,11 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Member[]
 
 // Función para crear un nuevo workspace
 export async function createWorkspace(name: string, ownerId: string) {
-  console.log('🏗️ Creando workspace:', { name, ownerId });
+  console.log('🏗️ API createWorkspace: Function called with:', { name, ownerId });
   
   try {
     // // MEJORADO: Obtener información real del usuario propietario desde Firebase Auth
-    const auth = await import('./auth');
-    const currentUser = auth.auth.currentUser;
+    const currentUser = auth.currentUser;
     
     if (!currentUser) {
       console.error('❌ No hay usuario autenticado');
@@ -675,8 +676,7 @@ export async function addMemberToWorkspaceByEmail(
   role: 'admin' | 'member' = 'member'
 ): Promise<{ success: boolean; error?: any; member?: Member }> {
   try {
-    // // MEJORADO: Importar y usar función de búsqueda de usuarios
-    const { findUserByEmail } = await import('./users');
+    // // MEJORADO: Usar función de búsqueda de usuarios importada estáticamente
     
     // // Buscar usuario real por email
     const user = await findUserByEmail(userEmail);
@@ -909,11 +909,16 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
   // // Función para procesar cambios y llamar callback cuando tengamos todos los datos
   const processAndCallback = () => {
     completedSubscriptions++;
-    if (completedSubscriptions === 2) { // Esperamos 2 suscripciones
-      const workspaces = Array.from(allWorkspaces.values());
-      console.log('✅ Workspaces cargados correctamente (propios + miembro):', workspaces.length);
-      callback(workspaces);
-      completedSubscriptions = 0; // Reset para siguientes cambios
+    console.log('🔄 Progreso de suscripciones:', completedSubscriptions, 'de 2');
+
+    // Llamar callback inmediatamente cuando tengamos datos, no esperar a las 2 suscripciones
+    const workspaces = Array.from(allWorkspaces.values());
+    console.log('✅ Workspaces actualizados:', workspaces.length);
+    callback(workspaces);
+
+    // Reset para siguientes cambios solo si hemos completado ambas
+    if (completedSubscriptions === 2) {
+      completedSubscriptions = 0;
     }
   };
 
@@ -922,14 +927,14 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
     query(collection(db, 'workspaces'), where('ownerId', '==', userId)),
     (snapshot) => {
       console.log('📊 Workspaces propios encontrados:', snapshot.docs.length);
-      
+
       // // Remover workspaces propios anteriores del mapa
       for (const [key, workspace] of allWorkspaces.entries()) {
         if (workspace.ownerId === userId) {
           allWorkspaces.delete(key);
         }
       }
-      
+
       // // Agregar workspaces propios actualizados
       snapshot.docs.forEach(d => {
         const data = d.data();
@@ -944,7 +949,8 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
           updatedAt: data.updatedAt?.toDate?.() ?? new Date()
         } as Workspace);
       });
-      
+
+      console.log('🔄 Llamando processAndCallback desde owner subscription');
       processAndCallback();
     },
     (error) => {
@@ -993,10 +999,12 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
         }
       }
       
+      console.log('🔄 Llamando processAndCallback desde member subscription');
       processAndCallback();
     },
     (error) => {
       console.error('❌ Error en suscripción de membresías:', error);
+      console.log('🔄 Llamando processAndCallback desde member subscription (error)');
       processAndCallback(); // Continuar aunque falle esta suscripción
     }
   );
