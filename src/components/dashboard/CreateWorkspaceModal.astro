@@ -149,7 +149,10 @@ const { id = 'create-workspace-modal', show = false } = Astro.props;
             // Obtener usuario actual
             const currentUser = auth.currentUser;
             if (!currentUser) {
-              alert('Usuario no autenticado. Por favor, inicia sesión.');
+              (window as any).showToast({
+                message: 'Usuario no autenticado. Por favor, inicia sesión.',
+                type: 'error'
+              });
               submitBtn.disabled = false;
               submitBtn.textContent = 'Crear';
               return;
@@ -167,20 +170,24 @@ const { id = 'create-workspace-modal', show = false } = Astro.props;
               submitBtn.disabled = false;
               submitBtn.textContent = 'Crear';
               
-              // Mostrar confirmación después de que el modal se cierre completamente
-              setTimeout(() => {
-                alert('Workspace creado exitosamente: ' + name);
-              }, 350);
+              // Workspace creado exitosamente - sin alert
             } else {
               console.error('🔥 CreateWorkspaceModal: Error creando workspace:', result.error);
-              alert('Error al crear workspace: ' + (result.error || 'Error desconocido'));
+              (window as any).showToast({
+                message: 'Error al crear workspace: ' + (result.error || 'Error desconocido'),
+                type: 'error'
+              });
               submitBtn.disabled = false;
               submitBtn.textContent = 'Crear';
             }
 
           } catch (error) {
             console.error('🔥 CreateWorkspaceModal: Error:', error);
-            alert('Error al crear workspace: ' + error.message);
+            const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+            (window as any).showToast({
+              message: 'Error al crear workspace: ' + errorMessage,
+              type: 'error'
+            });
             submitBtn.disabled = false;
             submitBtn.textContent = 'Crear';
           }

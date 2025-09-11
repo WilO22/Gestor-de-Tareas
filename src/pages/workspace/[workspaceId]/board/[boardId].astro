@@ -33,7 +33,12 @@ const { workspaceId, boardId } = Astro.params;
   
   {/* Inicializamos la lógica de cliente con los IDs de la ruta */}
   <!-- Script procesado: inicializador de BoardPage; IDs se leen desde data attrs del root -->
-  <script src="../../../scripts/board/board-page.ts"></script>
+  <script>
+    import { initBoardPage } from '../../../scripts/board/board-page.ts';
+    
+    // Inicializar la página del board
+    initBoardPage();
+  </script>
 
   <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
     se generan dinámicamente en el cliente y no reciben el atributo de

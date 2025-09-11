@@ -4,6 +4,7 @@ export const prerender = false;
 import Layout from '../../../layouts/Layout.astro';
 const { workspaceId } = Astro.params;
 ---
+
 <Layout title="Tableros del Espacio de Trabajo">
   <main id="boards-root" data-workspace-id={workspaceId} class="p-8">
     <div class="mb-6">
@@ -11,15 +12,15 @@ const { workspaceId } = Astro.params;
         &larr; Volver a mis Espacios de Trabajo
       </a>
     </div>
-    
+
     <h1 id="workspace-name" class="text-3xl font-bold mb-6">Cargando...</h1>
 
     <form id="create-board-form" class="mb-6 flex gap-2">
-      <input 
-        type="text" 
-        id="board-name" 
-        placeholder="Nombre del nuevo tablero" 
-        class="flex-grow px-3 py-2 border rounded-lg" 
+      <input
+        type="text"
+        id="board-name"
+        placeholder="Nombre del nuevo tablero"
+        class="flex-grow px-3 py-2 border rounded-lg"
         required
       />
       <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
@@ -31,10 +32,13 @@ const { workspaceId } = Astro.params;
       <p id="loading-message">Cargando tableros...</p>
     </div>
   </main>
-
-  {/* Este script ahora es muy simple. Solo importa la lógica 
-    del archivo externo y la ejecuta.
-  */}
-  <!-- Script procesado: inicializador de Boards; workspaceId se pasa via data-workspace-id -->
-  <script src="../../scripts/workspace/boards-view.ts"></script>
 </Layout>
+
+<script>
+  import { initBoardsView } from '@/scripts/workspace/boards-view.ts';
+
+  // Inicializar la vista de boards cuando el DOM esté listo
+  document.addEventListener('DOMContentLoaded', () => {
+    initBoardsView();
+  });
+</script>

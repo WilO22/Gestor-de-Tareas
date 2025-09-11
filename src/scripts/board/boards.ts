@@ -110,15 +110,15 @@ export default function initBoards(workspaceId?: string) {
   });
 }
 
-// Auto-inicialización si el script se carga directamente y el DOM ya contiene #boards-root
-if (typeof window !== 'undefined') {
-  if (document.readyState !== 'loading') {
-    const root = document.getElementById('boards-root');
-    if (root) initBoards(root.dataset.workspaceId);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      const root = document.getElementById('boards-root');
-      if (root) initBoards(root.dataset.workspaceId);
-    });
-  }
-}
+// Auto-inicialización DESACTIVADA para evitar conflictos - ahora se maneja desde boards-view.ts
+// if (typeof window !== 'undefined') {
+//   if (document.readyState !== 'loading') {
+//     const root = document.getElementById('boards-root');
+//     if (root) initBoards(root.dataset.workspaceId);
+//   } else {
+//     document.addEventListener('DOMContentLoaded', () => {
+//       const root = document.getElementById('boards-root');
+//       if (root) initBoards(root.dataset.workspaceId);
+//     });
+//   }
+// }

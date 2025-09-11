@@ -49,18 +49,18 @@ export default async function initBoardPage(params?: { workspaceId?: string, boa
   });
 }
 
-// Auto-inicialización si el script se carga directamente
-if (typeof window !== 'undefined') {
-  if (document.readyState !== 'loading') {
-    const root = document.getElementById('board-root');
-    if (root) initBoardPage();
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      const root = document.getElementById('board-root');
-      if (root) initBoardPage();
-    });
-  }
-}
+// Auto-inicialización DESACTIVADA - ahora se llama explícitamente desde el componente
+// if (typeof window !== 'undefined') {
+//   if (document.readyState !== 'loading') {
+//     const root = document.getElementById('board-root');
+//     if (root) initBoardPage();
+//   } else {
+//     document.addEventListener('DOMContentLoaded', () => {
+//       const root = document.getElementById('board-root');
+//       if (root) initBoardPage();
+//     });
+//   }
+// }
 
 // Inicializar tablero
 async function initializeBoard(workspaceId: string, boardId: string) {

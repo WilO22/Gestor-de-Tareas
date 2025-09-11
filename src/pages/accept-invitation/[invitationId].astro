@@ -315,8 +315,14 @@ if (!invitationId) {
       if (!currentUser) {
         // // MEJORADO: Redirigir a login con información de la invitación
         const loginUrl = `/login?returnTo=${encodeURIComponent(window.location.pathname)}&inviteeEmail=${encodeURIComponent(currentInvitation?.inviteeEmail || '')}`;
-        alert('Debes iniciar sesión para aceptar esta invitación. Serás redirigido al login.');
-        window.location.href = loginUrl;
+        (window as any).showToast({
+          message: 'Debes iniciar sesión para aceptar esta invitación. Serás redirigido al login.',
+          type: 'warning'
+        });
+        // Pequeño delay para que se vea el toast antes de redirigir
+        setTimeout(() => {
+          window.location.href = loginUrl;
+        }, 1500);
         return;
       }
 
@@ -348,7 +354,10 @@ if (!invitationId) {
 
     } catch (error) {
       console.error('❌ Error aceptando invitación:', error);
-      alert('Error aceptando la invitación. Inténtalo de nuevo.');
+      (window as any).showToast({
+        message: 'Error aceptando la invitación. Inténtalo de nuevo.',
+        type: 'error'
+      });
     }
   }
 
@@ -360,8 +369,14 @@ if (!invitationId) {
       if (!currentUser) {
         // // MEJORADO: Redirigir a login con información de la invitación
         const loginUrl = `/login?returnTo=${encodeURIComponent(window.location.pathname)}&inviteeEmail=${encodeURIComponent(currentInvitation?.inviteeEmail || '')}`;
-        alert('Debes iniciar sesión para rechazar esta invitación. Serás redirigido al login.');
-        window.location.href = loginUrl;
+        (window as any).showToast({
+          message: 'Debes iniciar sesión para rechazar esta invitación. Serás redirigido al login.',
+          type: 'warning'
+        });
+        // Pequeño delay para que se vea el toast antes de redirigir
+        setTimeout(() => {
+          window.location.href = loginUrl;
+        }, 1500);
         return;
       }
 
@@ -379,13 +394,22 @@ if (!invitationId) {
         });
 
         console.log('✅ Invitación rechazada');
-        alert('Invitación rechazada');
-        window.location.href = '/';
+        (window as any).showToast({
+          message: 'Invitación rechazada',
+          type: 'info'
+        });
+        // Pequeño delay para que se vea el toast antes de redirigir
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       }
 
     } catch (error) {
       console.error('❌ Error rechazando invitación:', error);
-      alert('Error rechazando la invitación. Inténtalo de nuevo.');
+      (window as any).showToast({
+        message: 'Error rechazando la invitación. Inténtalo de nuevo.',
+        type: 'error'
+      });
     }
   }
 
