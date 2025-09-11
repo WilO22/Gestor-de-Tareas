@@ -1,0 +1,47 @@
+---
+// src/components/board/CreateBoardCard.astro
+// Tarjeta especial para crear un nuevo board
+
+import BaseCard from '../base/BaseCard.astro';
+
+export interface Props {
+  workspaceId: string;
+}
+
+const { workspaceId } = Astro.props;
+---
+
+<BaseCard
+  clickable={true}
+  variant="bordered"
+  size="md"
+  class="create-board-card hover:scale-105 transition-transform duration-200 cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 bg-gray-50 hover:bg-blue-50"
+  data-action="create-board"
+>
+  <!-- Icono de crear -->
+  <div class="flex flex-col items-center justify-center py-8 text-gray-400 hover:text-blue-500 transition-colors">
+    <svg class="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+    </svg>
+    <h3 class="text-lg font-semibold text-gray-700 mb-2">Crear nuevo tablero</h3>
+    <p class="text-sm text-gray-500 text-center">
+      Organiza tus tareas y proyectos en un nuevo tablero
+    </p>
+  </div>
+</BaseCard>
+
+<script>
+  // Manejar el click en la tarjeta de crear board
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const card = target.closest('[data-action="create-board"]');
+
+    if (card) {
+      e.preventDefault();
+      console.log('🎯 CreateBoardCard: Click detectado, disparando evento');
+
+      // Disparar evento para abrir el modal
+      document.dispatchEvent(new CustomEvent('create-board-requested'));
+    }
+  });
+</script>
