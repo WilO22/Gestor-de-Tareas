@@ -19,17 +19,3 @@
     Crear un espacio de<br />trabajo nuevo
   </span>
 </div>
-<script type="module" is:inline>
-  // Emitir evento personalizado al hacer click o enter
-  const card = document.getElementById('create-workspace-card');
-  if (card) {
-    card.addEventListener('click', () => {
-      document.dispatchEvent(new CustomEvent('create-workspace-requested'));
-    });
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        document.dispatchEvent(new CustomEvent('create-workspace-requested'));
-      }
-    });
-  }
-</script>

@@ -1,0 +1,120 @@
+---
+// src/components/dashboard/CreateWorkspaceModal.astro
+// Modal para crear un nuevo workspace con input de nombre
+import BaseModal from '../base/BaseModal.astro';
+
+const { id = 'create-workspace-modal', show = false } = Astro.props;
+---
+<BaseModal
+  id={id}
+  title="Crear nuevo espacio de trabajo"
+  showHeader={true}
+  showFooter={false}
+  size="sm"
+  closable={true}
+  closeOnOverlay={true}
+  closeOnEscape={true}
+  animation="scale"
+  animationDuration={250}
+  ariaLabel="Crear nuevo espacio de trabajo"
+  class="z-[100]"
+>
+  <form id="create-workspace-form" class="space-y-6" autocomplete="off">
+    <div>
+      <label for="workspace-name" class="block text-sm font-medium text-gray-700 mb-2">Nombre del espacio de trabajo</label>
+      <input
+        id="workspace-name"
+        name="workspace-name"
+        type="text"
+        required
+        minlength="2"
+        maxlength="40"
+        class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base placeholder-gray-400 transition"
+        placeholder="Ej: Equipo de Marketing"
+        autofocus
+      />
+    </div>
+    <div class="flex justify-end space-x-3 pt-2">
+      <button type="button" id="cancel-create-workspace" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+      <button type="submit" id="submit-create-workspace" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-semibold">Crear</button>
+    </div>
+  </form>
+  <script type="module" is:inline>
+    // Lógica de modal y creación de workspace compatible con navegador
+    let modalId = "create-workspace-modal";
+    function openModal(modalId) {
+      const overlay = document.getElementById(`${modalId}-overlay`);
+      const modal = document.getElementById(modalId);
+      if (!overlay || !modal) return;
+      overlay.classList.remove('hidden', 'opacity-0');
+      modal.classList.remove('opacity-0');
+      modal.classList.add('opacity-100', 'scale-100', 'translate-y-0', 'translate-x-0');
+      modal.focus?.();
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal(modalId) {
+      const overlay = document.getElementById(`${modalId}-overlay`);
+      const modal = document.getElementById(modalId);
+      if (!overlay || !modal) return;
+      overlay.classList.add('opacity-0');
+      modal.classList.remove('opacity-100', 'scale-100', 'translate-y-0', 'translate-x-0');
+      modal.classList.add('opacity-0');
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        document.body.style.overflow = '';
+      }, 300);
+    }
+    const form = document.getElementById('create-workspace-form');
+    const input = document.getElementById('workspace-name');
+    const cancelBtn = document.getElementById('cancel-create-workspace');
+    if (form && input) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = input.value.trim();
+        if (name.length < 2) {
+          input.focus();
+          input.classList.add('ring-2', 'ring-red-400');
+          return;
+        }
+        input.classList.remove('ring-2', 'ring-red-400');
+        form.querySelector('button[type="submit"]').setAttribute('disabled', 'true');
+        form.querySelector('button[type="submit"]').textContent = 'Creando...';
+        try {
+          // Obtener usuario autenticado
+          const auth = await import('../../firebase/auth');
+          const user = auth.auth.currentUser;
+          if (!user) throw new Error('No autenticado');
+          // Llamada directa a la API para crear workspace
+          const res = await fetch('/api/workspace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, ownerId: user.uid })
+          });
+          const result = await res.json();
+          if (result.success) {
+            closeModal(modalId);
+            input.value = '';
+            document.dispatchEvent(new CustomEvent('workspace-created', { detail: { id: result.id, name } }));
+          } else {
+            alert('Error al crear workspace: ' + (result.error?.message || result.error || 'Desconocido'));
+          }
+        } catch (err) {
+          alert('Error al crear workspace: ' + (err?.message || err));
+        } finally {
+          form.querySelector('button[type="submit"]').removeAttribute('disabled');
+          form.querySelector('button[type="submit"]').textContent = 'Crear';
+        }
+      });
+    }
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        closeModal(modalId);
+      });
+    }
+    // Abrir modal cuando se dispare el evento global
+    document.addEventListener('create-workspace-requested', () => {
+      openModal(modalId);
+      setTimeout(() => input?.focus(), 100);
+    });
+  </script>
+</BaseModal>
