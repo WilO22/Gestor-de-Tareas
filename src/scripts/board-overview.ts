@@ -24,20 +24,7 @@ function showBoardsView(workspaceId: string) {
   try { document.dispatchEvent(new CustomEvent('sidebar-action-handled', { detail: { action: 'boards', workspaceId } })); } catch (e) { /* ignore */ }
 }
 
-function showWorkspacesView() {
-  if (boardsUnsubscribe) {
-    boardsUnsubscribe();
-    boardsUnsubscribe = null;
-  }
-
-  const workspacesView = document.getElementById('workspaces-view');
-  const boardsView = document.getElementById('boards-view');
-  if (workspacesView && boardsView) {
-    workspacesView.classList.remove('hidden');
-    boardsView.classList.add('hidden');
-  }
-  currentWorkspaceId = null;
-}
+// Eliminado: función showWorkspacesView y lógica antigua de workspaces-view (legacy)
 
 async function loadWorkspaceDetails(workspaceId: string) {
   try {
@@ -189,6 +176,6 @@ export default function initBoardOverview() {
   });
 
   // Expose for other scripts
-  (window as any).showWorkspacesView = showWorkspacesView;
+  // Eliminado: API global showWorkspacesView (legacy)
   (window as any).showBoardsView = showBoardsView;
 }

@@ -10,9 +10,7 @@ import SettingsView from './SettingsView.astro';
 
 <main class="flex-1 w-full min-w-0 p-0 bg-gray-50">
   <div class="w-full h-full">
-    <div id="workspaces-view" class="view hidden w-full h-full">
-      <WorkspacesViewIsland client:load />
-    </div>
+  <!-- Eliminado: vista legacy de workspaces-view, solo usar island modular en dashboard.astro -->
 
     <div id="boards-view" class="view hidden">
       <BoardsView workspaceId="" />
