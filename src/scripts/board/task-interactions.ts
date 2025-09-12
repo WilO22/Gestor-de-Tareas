@@ -8,6 +8,9 @@ import type { Task } from '../../types/domain';
 
 // Estado de selección
 let selectedTaskId: string | null = null;
+
+// Estado de restauración para prevenir cierre del dropdown
+let isRestoring = false;
 let selectedColumnId: string | null = null;
 
 // Referencias a listeners delegados para poder removerlos
@@ -67,6 +70,8 @@ async function restoreArchivedDropdownState(previousState: { isArchivedViewOpen:
 async function optimizedRestoreTask(taskId: string) {
   console.log('🔄 optimizedRestoreTask llamada con:', taskId);
 
+  isRestoring = true; // Prevenir cierre del dropdown durante la restauración
+
   // Preservar el estado del dropdown antes de la restauración
   const dropdownState = preserveArchivedDropdownState();
 
@@ -84,7 +89,7 @@ async function optimizedRestoreTask(taskId: string) {
 
     // Actualizar la lista de elementos archivados
     if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-      (window as any).loadArchivedColumnsInDropdown(true);
+      (window as any).loadArchivedColumnsInDropdown();
     }
 
     // Recargar el board para mostrar la tarea restaurada
@@ -98,6 +103,11 @@ async function optimizedRestoreTask(taskId: string) {
       if (typeof (window as any).resumeDropdownCloseListener === 'function') {
         (window as any).resumeDropdownCloseListener();
       }
+
+      isRestoring = false; // Permitir cierre del dropdown después de la restauración
+
+      // Prevenir cierre del dropdown por 2 segundos después de la restauración
+      (window as any).preventDropdownCloseUntil = Date.now() + 2000;
     }, 500); // Aumentar el tiempo de espera
 
     return { success: true };
@@ -109,6 +119,8 @@ async function optimizedRestoreTask(taskId: string) {
       (window as any).resumeDropdownCloseListener();
     }
     
+    isRestoring = false; // Permitir cierre del dropdown en caso de error
+    
     return { success: false, error };
   }
 }
@@ -116,6 +128,8 @@ async function optimizedRestoreTask(taskId: string) {
 // Función global para restaurar columna (llamada desde BoardHeader.astro)
 async function optimizedRestoreColumn(columnId: string) {
   console.log('🔄 optimizedRestoreColumn llamada con:', columnId);
+
+  isRestoring = true; // Prevenir cierre del dropdown durante la restauración
 
   // Preservar el estado del dropdown antes de la restauración
   const dropdownState = preserveArchivedDropdownState();
@@ -138,7 +152,7 @@ async function optimizedRestoreColumn(columnId: string) {
 
     // Actualizar la lista de elementos archivados
     if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-      (window as any).loadArchivedColumnsInDropdown(true);
+      (window as any).loadArchivedColumnsInDropdown();
     }
 
     // Recargar el board para mostrar la columna restaurada
@@ -152,6 +166,11 @@ async function optimizedRestoreColumn(columnId: string) {
       if (typeof (window as any).resumeDropdownCloseListener === 'function') {
         (window as any).resumeDropdownCloseListener();
       }
+
+      isRestoring = false; // Permitir cierre del dropdown después de la restauración
+
+      // Prevenir cierre del dropdown por 2 segundos después de la restauración
+      (window as any).preventDropdownCloseUntil = Date.now() + 2000;
     }, 500); // Aumentar el tiempo de espera
 
     return { success: true };
@@ -162,6 +181,8 @@ async function optimizedRestoreColumn(columnId: string) {
     if (typeof (window as any).resumeDropdownCloseListener === 'function') {
       (window as any).resumeDropdownCloseListener();
     }
+    
+    isRestoring = false; // Permitir cierre del dropdown en caso de error
     
     return { success: false, error };
   }
@@ -251,6 +272,7 @@ async function showColumnDeleteModal(columnId: string, columnName: string, butto
   };
 
   modal.addEventListener('click', async (e) => {
+    e.stopPropagation(); // Prevenir que el click se propague y cierre el dropdown
     const target = e.target as HTMLElement;
     console.log('🗑️ Click detectado en modal:', target.className);
 
@@ -262,6 +284,10 @@ async function showColumnDeleteModal(columnId: string, columnName: string, butto
 
     if (target.closest('.confirm-column-delete')) {
       console.log('🗑️ Confirmando eliminación de columna:', columnId);
+
+      // Cerrar modal inmediatamente para mejor UX
+      closeModal();
+
       try {
         console.log('�️ Eliminando columna permanentemente:', columnId);
 
@@ -275,14 +301,13 @@ async function showColumnDeleteModal(columnId: string, columnName: string, butto
 
         // Actualizar la lista de elementos archivados
         if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-          (window as any).loadArchivedColumnsInDropdown(true);
+          (window as any).loadArchivedColumnsInDropdown();
         }
-
-        closeModal();
 
       } catch (error) {
         console.error('❌ Error eliminando columna:', error);
-        closeModal();
+        // El modal ya está cerrado, mostrar error de otra forma si es necesario
+        (window as any).showToast?.('Error al eliminar la columna');
       }
     }
   });
@@ -300,7 +325,7 @@ async function deleteTaskGlobal(taskId: string) {
 
     // Actualizar la lista de elementos archivados
     if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-      (window as any).loadArchivedColumnsInDropdown(true);
+      (window as any).loadArchivedColumnsInDropdown();
     }
 
     return { success: true };
@@ -318,6 +343,7 @@ console.log('�🚀 Exponiendo funciones globales de task-interactions...');
 (window as any).optimizedRestoreColumn = optimizedRestoreColumn;
 (window as any).showColumnDeleteModal = showColumnDeleteModal;
 (window as any).deleteTask = deleteTaskGlobal;
+(window as any).isRestoring = () => isRestoring;
 
 console.log('✅ Funciones globales expuestas:', {
   optimizedRestoreTask: typeof (window as any).optimizedRestoreTask,
@@ -336,65 +362,19 @@ export function setupTaskInteractions() {
 
   console.log('🎯 Configurando interacciones de tareas...');
 
-  // Función simplificada para debugging
-  function initInteractions() {
-    console.log('🎯 Inicializando interacciones simplificadas...');
-
-    // Buscar todos los botones de agregar tarea
-    const addTaskButtons = document.querySelectorAll('.add-task-btn');
-    console.log(`📊 Encontrados ${addTaskButtons.length} botones de agregar tarea`);
-
-    // Agregar event listeners individuales a cada botón
-    addTaskButtons.forEach((button, index) => {
-      console.log(`🎯 Configurando botón ${index + 1}:`, button);
-
-      // Remover event listeners existentes para evitar duplicados
-      const newButton = button.cloneNode(true) as HTMLElement;
-      button.parentNode?.replaceChild(newButton, button);
-
-      // Agregar event listener
-      newButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        // Remover stopPropagation para no interferir con otros listeners
-        // event.stopPropagation();
-
-        console.log('🎯 Click detectado en botón agregar tarea');
-
-        // Encontrar el columnId
-        const columnContainer = newButton.closest('.flex.flex-col') as HTMLElement;
-        const taskList = columnContainer?.querySelector('.task-list') as HTMLElement;
-        const columnId = taskList?.getAttribute('data-id');
-
-        if (columnId) {
-          console.log('✅ ColumnId encontrado:', columnId);
-          showAddTaskInline(newButton);
-        } else {
-          console.error('❌ No se pudo encontrar columnId');
-        }
-      });
-
-      console.log(`✅ Event listener configurado para botón ${index + 1}`);
-    });
-
-    // Limpiar listeners delegados existentes
-    if (taskClickListener) {
-      document.removeEventListener('click', taskClickListener);
-    }
-    if (columnClickListener) {
-      document.removeEventListener('click', columnClickListener);
-    }
-
-    // También mantener los event listeners delegados como respaldo
-    taskClickListener = handleTaskClick;
-    columnClickListener = handleColumnClick;
-    document.addEventListener('click', taskClickListener);
-    document.addEventListener('click', columnClickListener);
-
-    console.log('✅ Interacciones simplificadas configuradas');
+  // Limpiar listeners delegados existentes
+  if (taskClickListener) {
+    document.removeEventListener('click', taskClickListener);
+  }
+  if (columnClickListener) {
+    document.removeEventListener('click', columnClickListener);
   }
 
-  // Ejecutar la inicialización
-  initInteractions();
+  // Configurar delegación de eventos para todos los elementos
+  taskClickListener = handleTaskClick;
+  columnClickListener = handleColumnClick;
+  document.addEventListener('click', taskClickListener);
+  document.addEventListener('click', columnClickListener);
 
   console.log('✅ Interacciones de tareas configuradas');
 
@@ -406,6 +386,7 @@ export function setupTaskInteractions() {
     runDiagnostics();
   }, 1000);
 }
+
 
 // Función de diagnóstico para debugging
 function runDiagnostics() {
@@ -428,21 +409,34 @@ function runDiagnostics() {
     console.log(`  - Está visible: ${(btn as HTMLElement).offsetParent !== null}`);
   });
 
-  // Verificar que los event listeners estén funcionando
-  console.log('🎯 Probando event listeners...');
-  const testEvent = new Event('click', { bubbles: true });
-  const firstButton = addTaskButtons[0] as HTMLElement;
-  if (firstButton) {
-    console.log('🚀 Disparando evento de prueba en primer botón...');
-    firstButton.dispatchEvent(testEvent);
-  }
-
   console.log('✅ Diagnóstico completado');
 }
 
 // Manejar clicks en tareas
 function handleTaskClick(event: Event) {
   const target = event.target as HTMLElement;
+
+  // Manejar clicks en botones de agregar tarea
+  if (target.closest('.add-task-btn')) {
+    event.preventDefault();
+    console.log('🎯 Click detectado en botón agregar tarea via delegación');
+
+    const addTaskBtn = target.closest('.add-task-btn') as HTMLElement;
+
+    // Encontrar el columnId
+    const columnContainer = addTaskBtn.closest('.flex.flex-col') as HTMLElement;
+    const taskList = columnContainer?.querySelector('.task-list') as HTMLElement;
+    const columnId = taskList?.getAttribute('data-id');
+
+    if (columnId) {
+      console.log('✅ ColumnId encontrado:', columnId);
+      showAddTaskInline(addTaskBtn);
+    } else {
+      console.error('❌ No se pudo encontrar columnId');
+    }
+    return;
+  }
+
   const taskElement = target.closest('[data-task-id]') as HTMLElement;
 
   if (!taskElement) return;
@@ -471,12 +465,6 @@ function handleTaskClick(event: Event) {
 function handleColumnClick(event: Event) {
   const target = event.target as HTMLElement;
   console.log('🎯 Click detectado en columna:', target.className, target.tagName);
-
-  // Ignorar clicks en botones de agregar tarea (ya manejados por listeners individuales)
-  if (target.closest('.add-task-btn')) {
-    console.log('ℹ️ Click en botón agregar tarea, ignorando en handler de columna');
-    return;
-  }
 
   // Verificar si el click ocurrió dentro de una columna
   const columnContainer = target.closest('.flex.flex-col') as HTMLElement;
@@ -722,8 +710,28 @@ function showAddTaskInline(addTaskBtn: HTMLElement) {
 
       if (result.success) {
         console.log('✅ Tarea creada exitosamente');
+
+        if (!result.id) {
+          console.error('❌ No se recibió ID de tarea creada');
+          (window as any).showToast('Error: No se pudo crear la tarea');
+          return;
+        }
+
+        // Crear objeto de tarea para el estado local
+        const newTask: Task = {
+          id: result.id,
+          title: taskInput.value.trim(),
+          boardId: boardId,
+          columnId: columnId,
+          order: existingTasks,
+          archived: false,
+          createdAt: new Date()
+        };
+
+        // NO agregar al estado local aquí, el tiempo real lo hará
+        // La actualización en tiempo real agregará la nueva tarea
+
         taskInput.value = ''; // Mantener el campo abierto para agregar más tareas
-        await reloadBoard();
       } else {
         console.error('❌ Error al crear tarea:', result.error);
         (window as any).showToast('Error al crear la tarea');
@@ -785,6 +793,9 @@ function showAddTaskInline(addTaskBtn: HTMLElement) {
       formContainer.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
     }
   });
+
+  // Enfocar automáticamente el textarea para mejor UX
+  taskInput.focus();
 
   console.log('✅ Campo inline configurado completamente');
 }
@@ -1082,33 +1093,42 @@ async function handleEditTask(taskId: string, modal: HTMLElement) {
   }
 }
 
-// Función auxiliar para recargar el board
+// Función auxiliar para recargar el board de manera eficiente
 async function reloadBoard() {
   const boardRoot = document.getElementById('board-root');
   const boardId = boardRoot?.getAttribute('data-board-id');
 
   if (boardId) {
     try {
-      console.log('🔄 Recargando board:', boardId);
+      console.log('🔄 Recargando board eficientemente:', boardId);
 
-      // Obtener board actualizado
+      // Obtener datos actualizados del board
       const { fetchBoardInfo } = await import('../../firebase/api');
-
       const board = await fetchBoardInfo(boardId);
+
       if (board) {
-        // Usar la función renderColumns del módulo board-init
+        // Actualizar estado global
+        const { updateCurrentColumns, updateCurrentTasks } = await import('./board-state');
+        updateCurrentColumns(board.columns);
+        updateCurrentTasks(board.columns.flatMap(col => col.tasks || []));
+
+        // Re-renderizar las columnas
         const { renderColumns } = await import('./board-init');
         await renderColumns(board);
 
-        // Re-inicializar las interacciones después de recargar
+        // Re-inicializar funcionalidades
         setTimeout(async () => {
+          const { initDragAndDrop } = await import('./drag-and-drop');
+          const { setupTaskInteractions } = await import('./task-interactions');
+
           // Resetear flag para permitir re-inicialización
           isInteractionsInitialized = false;
-          const { setupTaskInteractions } = await import('./task-interactions');
+
+          initDragAndDrop();
           setupTaskInteractions();
         }, 100);
 
-        console.log('✅ Board recargado exitosamente');
+        console.log('✅ Board recargado eficientemente');
       }
     } catch (error) {
       console.error('❌ Error recargando board:', error);
@@ -1423,7 +1443,7 @@ async function archiveColumnById(columnId: string) {
 
     // Actualizar la lista de elementos archivados en el dropdown
     if (typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-      (window as any).loadArchivedColumnsInDropdown(true);
+      (window as any).loadArchivedColumnsInDropdown();
     }
 
     // No mostrar notificación ni alert según requerimiento del usuario
@@ -1451,7 +1471,7 @@ async function handleColumnAction(action: string, columnId: string) {
 
 // Función global para cargar elementos archivados en el dropdown
 // Se llama desde BoardHeader.astro
-async function loadArchivedColumnsInDropdown(forceRefresh = false) {
+async function loadArchivedColumnsInDropdown() {
   console.log('📥 Cargando elementos archivados para dropdown...');
 
   const boardRoot = document.getElementById('board-root');
@@ -1494,6 +1514,12 @@ async function loadArchivedColumnsInDropdown(forceRefresh = false) {
     // Limpiar lista existente
     const existingItems = archivedTasksList.querySelectorAll('.archived-task-item, .archived-column-item');
     existingItems.forEach(item => item.remove());
+
+    // Verificar si ya existe un mensaje vacío
+    const existingEmptyMessage = archivedTasksList.querySelector('.text-center');
+    if (existingEmptyMessage) {
+      existingEmptyMessage.remove();
+    }
 
     // Si no hay elementos archivados, mostrar mensaje
     if (archivedTasks.length === 0 && archivedColumns.length === 0) {

@@ -9,8 +9,8 @@ import {
   subscribeToWorkspace,
   subscribeToTask
 } from '../firebase/api';
+import type { Board, Workspace, Column, Task } from '../types/domain';
 import type { Unsubscribe } from 'firebase/firestore';
-import type { Board, Workspace, Task } from '../types/domain';
 
 export interface RealtimeSubscription {
   id: string;
@@ -36,17 +36,14 @@ export class RealtimeManagerService {
   }
 
   // Suscribirse a cambios en un board específico
-  subscribeToBoard(boardId: string, callback: (board: Board) => void): string {
+  subscribeToBoard(boardId: string, callback: (columns: Column[], tasks: Task[]) => void): string {
     const subscriptionId = `board-${boardId}-${Date.now()}`;
 
     console.log('📡 Suscribiéndose a cambios del board:', boardId);
 
-    const unsubscribe = subscribeToBoardChanges(boardId, (_columns, _tasks) => {
-      console.log('🔄 Board actualizado en tiempo real:', boardId);
-      void _columns; void _tasks; // evitar warnings si no se usan aún
-      // Aquí necesitaríamos reconstruir el board completo desde columns y tasks
-      // Por ahora, emitimos un evento genérico
-      callback({} as any); // TODO: Implementar reconstrucción completa del board
+    const unsubscribe = subscribeToBoardChanges(boardId, (columns, tasks) => {
+      console.log('🔄 Board actualizado en tiempo real:', boardId, 'Columnas:', columns.length, 'Tareas:', tasks.length);
+      callback(columns, tasks);
     });
 
     this.subscriptions.set(subscriptionId, {

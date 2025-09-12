@@ -176,23 +176,22 @@
       // Solo cargar tareas archivadas si la lista está vacía o no se ha cargado
       const tasksList = document.getElementById('archived-tasks-list');
       const loadingElement = document.getElementById('loading-archived');
-      const existingTasks = tasksList?.querySelectorAll('.archived-task-item');
       
-      // Verificar si el único elemento es el mensaje vacío (no tareas reales)
-      const hasOnlyEmptyMessage = existingTasks?.length === 1 && 
-                                 existingTasks[0].textContent?.includes('No hay elementos archivados');
+      if (!tasksList) return;
+      
+      // Obtener todos los elementos hijos que no son el loading
+      const children = Array.from(tasksList.children).filter(child => child.id !== 'loading-archived');
+      
+      // Verificar si ya hay contenido cargado (tareas archivadas o mensaje vacío)
+      const hasContent = children.length > 0;
       
       // Cargar solo si:
-      // 1. Está mostrando el loading (primera vez)
-      // 2. No hay tareas en la lista
-      // 3. Solo tiene el mensaje vacío (nueva verificación)
-      const shouldLoad = loadingElement?.style.display !== 'none' || 
-                        !existingTasks || 
-                        existingTasks.length === 0 ||
-                        hasOnlyEmptyMessage;
+      // 1. El loading está visible (primera vez)
+      // 2. No hay contenido cargado
+      const shouldLoad = loadingElement?.style.display !== 'none' || !hasContent;
 
       if (shouldLoad && typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-        (window as any).loadArchivedColumnsInDropdown(true); // Forzar recarga para obtener datos frescos
+        (window as any).loadArchivedColumnsInDropdown(); // Forzar recarga para obtener datos frescos
       }
     }
 
@@ -545,6 +544,18 @@
         return; // Si está pausado, no hacer nada
       }
       
+      // No cerrar si estamos en una operación de restauración
+      if ((window as any).isRestoring) {
+        console.log('🔄 Operación de restauración en curso, no cerrar dropdown');
+        return;
+      }
+      
+      // No cerrar si estamos en período de prevención de cierre después de restauración
+      if ((window as any).preventDropdownCloseUntil && Date.now() < (window as any).preventDropdownCloseUntil) {
+        console.log('⏳ Previniendo cierre de dropdown después de restauración');
+        return;
+      }
+      
       const target = e.target as Element;
       
       // No cerrar si el click es en el botón de elementos archivados o sus hijos
@@ -556,6 +567,12 @@
       // No cerrar si el click es en el trigger del menú
       if (target?.id === 'board-menu-trigger' || target?.closest('#board-menu-trigger')) {
         console.log('🎯 Click en trigger del menú, no cerrar dropdown');
+        return;
+      }
+      
+      // No cerrar si el click es en botones de acción del dropdown
+      if (target?.closest('.restore-column') || target?.closest('.restore-task') || target?.closest('.delete-column') || target?.closest('.delete-task')) {
+        console.log('🎯 Click en botón de acción en dropdown, no cerrar');
         return;
       }
       

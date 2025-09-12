@@ -45,7 +45,9 @@ export function getColumnsContainer(): HTMLElement | null {
 
 // Obtener tareas de una columna específica
 export function getTasksForColumn(columnId: string, tasks: Task[]): Task[] {
-  return tasks.filter(task => task.columnId === columnId);
+  return tasks
+    .filter(task => task.columnId === columnId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 // Encontrar columna por ID

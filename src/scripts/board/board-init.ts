@@ -5,9 +5,10 @@ import { fetchBoardInfo, createColumn, updateColumn, archiveColumn, getArchivedT
 import { getAuth, onAuthStateChanged } from '../../firebase/auth';
 import { initDragAndDrop } from './drag-and-drop';
 import { setupTaskInteractions, clearTaskSelection } from './task-interactions';
-import { createAddColumnButton } from './board-render';
-import { updateCurrentColumns, updateCurrentTasks } from './board-state';
-import type { Board, Column } from '../../types/domain';
+import { createAddColumnButton, renderTasksInColumn } from './board-render';
+import { updateCurrentColumns, updateCurrentTasks, getCurrentTasks, currentColumns, currentBoard, currentTasks, updateCurrentBoard } from './board-state';
+import { realtimeManager } from '../../services/realtime-manager.service';
+import type { Board, Column, Task } from '../../types/domain';
 
 export function initBoardPage() {
   console.log('🚀 Inicializando página del board...');
@@ -63,6 +64,9 @@ async function loadBoardData(boardId: string) {
     console.log('📋 Columnas encontradas:', board.columns?.length || 0);
     console.log('📝 Detalle de columnas:', board.columns);
 
+    // Actualizar estado global del board
+    updateCurrentBoard(board);
+
     // Limpiar selección anterior
     clearTaskSelection();
 
@@ -103,6 +107,11 @@ async function loadBoardData(boardId: string) {
         setupArchivedFunctionality(boardId);
         console.log('✅ Funcionalidad de archivados configurada');
 
+        // Inicializar sincronización en tiempo real
+        console.log('🎯 Inicializando sincronización en tiempo real...');
+        setupRealtimeSync(boardId);
+        console.log('✅ Sincronización en tiempo real inicializada');
+
         // Verificar que los event listeners se configuraron correctamente
         console.log('🔍 Verificando configuración de event listeners...');
         const testButton = document.querySelector('.add-task-btn') as HTMLElement;
@@ -117,6 +126,119 @@ async function loadBoardData(boardId: string) {
     console.error('❌ Error cargando board:', error);
     showError('Error al cargar el tablero');
   }
+}
+
+// Renderizar columnas desde actualizaciones en tiempo real (sin resetear estado de tareas)
+export async function renderColumnsFromRealtime(board: Board) {
+  console.log('🎨 Renderizando columnas desde realtime...');
+
+  const container = document.getElementById('columns-container');
+
+  if (!container) {
+    console.error('❌ No se encontró el contenedor de columnas');
+    return;
+  }
+
+  // NO actualizar estado global de tareas aquí (ya se hizo arriba)
+  // Solo actualizar columnas
+  updateCurrentColumns(board.columns);
+
+  // Renderizar columnas existentes
+  const columnsHTML = board.columns.map((column: Column, index: number) => {
+    // Colores para las barras superiores de las columnas
+    const columnColors = [
+      'bg-blue-400', 'bg-green-400', 'bg-purple-400', 'bg-pink-400',
+      'bg-indigo-400', 'bg-red-400', 'bg-yellow-400', 'bg-teal-400'
+    ];
+    const columnColor = columnColors[index % columnColors.length];
+
+    // Crear HTML de la columna
+    const tasksHTML = renderTasksInColumn(column, index);
+
+    return `
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 min-w-80 max-w-80 flex flex-col">
+      <!-- Barra superior coloreada -->
+      <div class="${columnColor} h-1 rounded-t-lg"></div>
+
+      <!-- Header de la columna -->
+      <div class="p-4 pb-2">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-gray-800 text-sm">${column.name}</h3>
+          <div class="flex items-center space-x-1">
+            <span class="text-xs text-gray-500">${column.tasks?.length || 0}</span>
+            <button class="column-menu-btn text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors" title="Opciones de columna">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de tareas -->
+      <div class="task-list px-4 pb-2 space-y-2 min-h-8" data-id="${column.id}">
+        ${tasksHTML}
+      </div>
+
+      <!-- Área de agregar tarea -->
+      <div class="p-4 pt-2">
+        <div class="add-task-area">
+          <button class="add-task-btn w-full text-left text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded p-2 transition-all duration-200 flex items-center">
+            <svg class="w-5 h-5 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Añadir una tarea
+          </button>
+
+          <!-- Formulario inline para agregar tarea -->
+          <div class="add-task-form hidden mt-2">
+            <textarea class="task-input w-full p-2 border border-gray-300 rounded resize-none text-sm" placeholder="Introduce el título de la tarea..." rows="2"></textarea>
+            <div class="flex items-center space-x-2 mt-2">
+              <button class="add-task-submit bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded transition-colors duration-150">Añadir tarea</button>
+              <button class="cancel-add-task text-gray-500 hover:text-gray-700 text-sm font-medium px-3 py-1.5 rounded transition-colors duration-150">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `;
+  }).join('');
+
+  // Agregar botón "Añadir otra lista" al final
+  const addColumnButton = createAddColumnButton().outerHTML;
+  const finalHTML = `
+    <div class="flex gap-6 overflow-x-auto pb-4" id="columns-wrapper">
+      ${columnsHTML}
+      ${addColumnButton}
+    </div>
+  `;
+
+  // Actualizar el DOM
+  container.innerHTML = finalHTML;
+
+  // Configurar listeners de scroll
+  const wrapper = container.querySelector('#columns-wrapper') as HTMLElement;
+  if (wrapper) {
+    wrapper.addEventListener('scroll', () => {
+      if (!(window as any).shouldAutoScroll) {
+        (window as any).setUserScrollPosition(wrapper.scrollLeft);
+      }
+    });
+  }
+
+  // Configurar funcionalidad del botón de agregar columna
+  setupAddColumnFunctionality();
+
+  console.log('✅ Columnas renderizadas desde realtime');
+
+  // Re-inicializar funcionalidades
+  setTimeout(() => {
+    console.log('🔄 Re-inicializando funcionalidades después de renderizado realtime...');
+    initDragAndDrop();
+    setupTaskInteractions();
+    setupArchivedFunctionality(board.id);
+    console.log('✅ Funcionalidades re-inicializadas');
+  }, 100);
 }
 
 // Renderizar columnas del board
@@ -166,6 +288,9 @@ export async function renderColumns(board: Board) {
   }
 
   console.log('✅ Hay columnas, renderizando...');
+
+  // Actualizar estado global del board
+  updateCurrentBoard(board);
 
   // Actualizar estado global con las columnas cargadas
   updateCurrentColumns(board.columns);
@@ -559,4 +684,202 @@ function showError(message: string) {
       </div>
     `;
   }
+}
+
+// Configurar sincronización en tiempo real para el board
+function setupRealtimeSync(boardId: string) {
+  console.log('🔄 Configurando sincronización en tiempo real para board:', boardId);
+
+  // Variable para evitar bucles de actualización
+  let isUpdatingFromRealtime = false;
+
+  // Suscribirse a cambios en el board (columnas y tareas)
+  const boardSubscriptionId = realtimeManager.subscribeToBoard(boardId, (columns, tasks) => {
+    const now = Date.now();
+
+    // Si estamos en medio de una actualización desde realtime, ignorar
+    if (isUpdatingFromRealtime) {
+      console.log('🔄 Actualización en tiempo real ignorada (actualización en progreso)');
+      return;
+    }
+
+    console.log('🔄 Board actualizado en tiempo real, actualizando UI...');
+    console.log('📊 Columnas actualizadas:', columns.length, 'Tareas actualizadas:', tasks.length);
+
+    isUpdatingFromRealtime = true;
+
+    try {
+      // Actualizar el estado global fusionando con tareas locales existentes
+      updateCurrentColumns(columns);
+
+      // Fusionar tareas: mantener tareas locales que no estén en la actualización remota
+      // y actualizar las que sí estén
+      const currentTasks = getCurrentTasks();
+      const mergedTasks = [...currentTasks];
+
+      // Actualizar o agregar tareas que vienen del servidor
+      tasks.forEach(serverTask => {
+        const existingIndex = mergedTasks.findIndex(localTask => localTask.id === serverTask.id);
+        if (existingIndex >= 0) {
+          // Actualizar tarea existente
+          mergedTasks[existingIndex] = serverTask;
+        } else {
+          // Agregar tarea nueva del servidor
+          mergedTasks.push(serverTask);
+        }
+      });
+
+      // Remover tareas que ya no existen en el servidor (excepto las locales recientes)
+      const now = Date.now();
+      const recentTaskThreshold = 30000; // 30 segundos
+      const filteredTasks = mergedTasks.filter(task => {
+        const existsOnServer = tasks.some(serverTask => serverTask.id === task.id);
+        if (existsOnServer) return true;
+
+        // Mantener tareas locales recientes (asumiendo que tienen createdAt)
+        const isRecentLocalTask = task.createdAt &&
+          (now - new Date(task.createdAt).getTime()) < recentTaskThreshold;
+        return isRecentLocalTask;
+      });
+
+      updateCurrentTasks(filteredTasks);
+
+      updateCurrentColumns(columns);
+
+      // Re-renderizar las columnas con los nuevos datos
+      const board = {
+        id: boardId,
+        name: document.getElementById('board-title')?.textContent || 'Board',
+        workspaceId: document.getElementById('board-root')?.getAttribute('data-workspace-id') || '',
+        columns: columns,
+        members: [],
+        ownerId: '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as Board;
+
+      // Actualizar estado global del board
+      updateCurrentBoard(board);
+
+      // Renderizar sin resetear el estado de tareas (ya se actualizó arriba)
+      renderColumnsFromRealtime(board);
+      // Re-inicializar funcionalidades después del re-render
+      setTimeout(() => {
+        console.log('🔄 Re-inicializando funcionalidades después de actualización en tiempo real...');
+        initDragAndDrop();
+        setupTaskInteractions();
+        setupArchivedFunctionality(boardId);
+        console.log('✅ Funcionalidades re-inicializadas');
+      }, 100);
+    } finally {
+      // Resetear el flag después de un breve delay
+      setTimeout(() => {
+        isUpdatingFromRealtime = false;
+      }, 500);
+    }
+  });
+
+  console.log('✅ Suscripción a board configurada:', boardSubscriptionId);
+
+  // Limpiar suscripciones cuando se navegue fuera de la página
+  window.addEventListener('beforeunload', () => {
+    console.log('🧹 Limpiando suscripciones de realtime...');
+    realtimeManager.unsubscribe(boardSubscriptionId);
+  });
+}
+
+// Configurar funcionalidad del botón de agregar columna
+function setupAddColumnFunctionality() {
+  const initialBtn = document.getElementById('add-column-initial-btn') as HTMLButtonElement;
+  const form = document.getElementById('add-column-form') as HTMLDivElement;
+  const input = document.getElementById('add-column-input') as HTMLInputElement;
+  const submitBtn = document.getElementById('add-column-submit-btn') as HTMLButtonElement;
+  const closeBtn = document.getElementById('add-column-close-btn') as HTMLButtonElement;
+
+  if (!initialBtn || !form || !input || !submitBtn || !closeBtn) {
+    console.warn('⚠️ No se encontraron todos los elementos del botón de agregar columna');
+    return;
+  }
+
+  const showForm = () => {
+    initialBtn.classList.add('hidden');
+    form.classList.remove('hidden');
+    input.focus();
+  };
+
+  const hideForm = () => {
+    initialBtn.classList.remove('hidden');
+    form.classList.add('hidden');
+    input.value = '';
+  };
+
+  // Event listeners
+  initialBtn.addEventListener('click', showForm);
+  closeBtn.addEventListener('click', hideForm);
+
+  // Event listener para el botón "Añadir lista"
+  submitBtn.addEventListener('click', async () => {
+    const columnName = input.value.trim();
+    if (columnName) {
+      try {
+        console.log('📝 Creando nueva columna:', columnName);
+
+        // Obtener boardId
+        const boardRoot = document.getElementById('board-root');
+        const boardId = boardRoot?.getAttribute('data-board-id');
+
+        if (!boardId) {
+          console.error('❌ No se pudo obtener el boardId');
+          return;
+        }
+
+        // Crear la columna usando la API
+        const result = await createColumn(columnName, boardId, currentColumns.length);
+
+        if (result && result.success && result.id) {
+          console.log('✅ Columna creada exitosamente con ID:', result.id);
+
+          // Crear objeto de columna para el estado local
+          const newColumn: Column = {
+            id: result.id,
+            name: columnName,
+            boardId: boardId,
+            order: currentColumns.length,
+            tasks: []
+          };
+
+          // NO actualizar estado local aquí, se hará en la actualización en tiempo real
+          // updateCurrentColumns([...currentColumns, newColumn]);
+
+          // NO agregar inmediatamente al DOM para evitar problemas de sincronización
+          // La actualización en tiempo real renderizará la nueva columna junto con todas las demás
+
+          hideForm();
+        } else {
+          console.error('❌ Error creando columna:', result);
+        }
+      } catch (error) {
+        console.error('❌ Error creando columna:', error);
+      }
+    }
+  });
+
+  // Event listener para Enter en el input
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      submitBtn.click();
+    } else if (e.key === 'Escape') {
+      hideForm();
+    }
+  });
+
+  // Cerrar formulario al hacer click fuera
+  document.addEventListener('click', (e) => {
+    const container = document.getElementById('add-column-button');
+    if (container && !container.contains(e.target as Node) && !form.classList.contains('hidden')) {
+      hideForm();
+    }
+  });
+
+  console.log('✅ Funcionalidad del botón de agregar columna configurada');
 }

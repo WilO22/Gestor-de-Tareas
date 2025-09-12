@@ -1117,6 +1117,16 @@ export function subscribeToBoardChanges(boardId: string, callback: (columns: Col
   
   let latestColumns: Column[] = [];
   let latestTasks: Task[] = [];
+  let columnsLoaded = false;
+  let tasksLoaded = false;
+  
+  // Función para llamar callback solo cuando ambas colecciones han sido cargadas
+  const tryCallback = () => {
+    if (columnsLoaded && tasksLoaded) {
+      console.log('🔄 Ambas colecciones cargadas, llamando callback - Columnas:', latestColumns.length, 'Tareas:', latestTasks.length);
+      callback(latestColumns, latestTasks);
+    }
+  };
   
   // Suscribirse a cambios en columnas
   const unsubscribeColumns = onSnapshot(columnsQuery, (snapshot) => {
@@ -1136,8 +1146,9 @@ export function subscribeToBoardChanges(boardId: string, callback: (columns: Col
       .filter(column => !column.archived) // // FILTRO: Solo columnas NO archivadas
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     
+    columnsLoaded = true;
     console.log('📊 Columnas filtradas (no archivadas):', latestColumns.length, 'de', snapshot.docs.length, 'totales');
-    callback(latestColumns, latestTasks);
+    tryCallback();
   });
   
   // Suscribirse a cambios en tareas
@@ -1162,8 +1173,9 @@ export function subscribeToBoardChanges(boardId: string, callback: (columns: Col
       .filter(task => !task.archived) // // FILTRO: Solo tareas NO archivadas
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     
+    tasksLoaded = true;
     console.log('📊 Tareas filtradas (no archivadas):', latestTasks.length, 'de', snapshot.docs.length, 'totales');
-    callback(latestColumns, latestTasks);
+    tryCallback();
   });
   
   // Retornar función para cancelar ambas suscripciones

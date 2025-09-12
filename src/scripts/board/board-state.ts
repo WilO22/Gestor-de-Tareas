@@ -81,3 +81,8 @@ export function setShouldAutoScroll(value: boolean) {
 export function setUserScrollPosition(position: number) {
   userScrollPosition = position;
 }
+
+// Función para obtener las tareas actuales (para fusión en realtime)
+export function getCurrentTasks(): Task[] {
+  return [...currentTasks];
+}
