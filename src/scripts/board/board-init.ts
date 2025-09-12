@@ -5,6 +5,8 @@ import { fetchBoardInfo, createColumn, updateColumn, archiveColumn, getArchivedT
 import { getAuth, onAuthStateChanged } from '../../firebase/auth';
 import { initDragAndDrop } from './drag-and-drop';
 import { setupTaskInteractions, clearTaskSelection } from './task-interactions';
+import { createAddColumnButton } from './board-render';
+import { updateCurrentColumns, updateCurrentTasks } from './board-state';
 import type { Board, Column } from '../../types/domain';
 
 export function initBoardPage() {
@@ -92,10 +94,6 @@ async function loadBoardData(boardId: string) {
         initDragAndDrop();
         console.log('✅ Drag & drop inicializado');
 
-        console.log('🎯 Configurando creación de columnas...');
-        setupColumnCreation();
-        console.log('✅ Creación de columnas configurada');
-
         console.log('🎯 Configurando interacciones de tareas...');
         setupTaskInteractions();
         console.log('✅ Interacciones de tareas configuradas');
@@ -148,16 +146,32 @@ export async function renderColumns(board: Board) {
           </div>
           <h3 class="text-lg font-medium text-gray-900 mb-2">No hay columnas aún</h3>
           <p class="text-gray-500 mb-4">Crea tu primera columna para empezar a organizar tus tareas</p>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-            Crear primera columna
-          </button>
         </div>
       </div>
     `;
+
+    // Agregar el botón de añadir columna
+    const centerDiv = container.querySelector('.text-center');
+    if (centerDiv) {
+      const addColumnBtn = createAddColumnButton();
+      // Cambiar el texto del botón para el caso de primera columna
+      const span = addColumnBtn.querySelector('span');
+      if (span) {
+        span.textContent = 'Crear primera columna';
+      }
+      centerDiv.appendChild(addColumnBtn);
+    }
+
     return;
   }
 
   console.log('✅ Hay columnas, renderizando...');
+
+  // Actualizar estado global con las columnas cargadas
+  updateCurrentColumns(board.columns);
+  updateCurrentTasks(board.columns.flatMap(col => col.tasks || []));
+
+  console.log('📊 Estado global actualizado - Columnas:', board.columns.length, 'Tareas:', board.columns.flatMap(col => col.tasks || []).length);
 
   // Renderizar columnas existentes
   const columnsHTML = board.columns.map((column: Column, index: number) => {
@@ -271,19 +285,16 @@ export async function renderColumns(board: Board) {
     <div class="bg-white min-h-screen p-8">
       <div class="flex gap-6 overflow-x-auto pb-4">
         ${columnsHTML}
-        <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg shadow-sm min-w-80 max-w-80 flex items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer" id="add-column-button">
-          <div class="text-center p-4">
-            <div class="w-8 h-8 bg-gray-300 rounded flex items-center justify-center mx-auto mb-2">
-              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-            </div>
-            <span class="text-sm text-gray-600">Añadir otra lista</span>
-          </div>
-        </div>
       </div>
     </div>
   `;
+
+  // Agregar el botón de añadir columna después de renderizar las columnas
+  const wrapper = container.querySelector('.flex.gap-6.overflow-x-auto');
+  if (wrapper) {
+    const addColumnBtn = createAddColumnButton();
+    wrapper.appendChild(addColumnBtn);
+  }
 
   console.log('✅ Columnas renderizadas correctamente');
 
@@ -298,54 +309,10 @@ export async function renderColumns(board: Board) {
     initDragAndDrop();
     console.log('✅ Drag & drop inicializado');
 
-    console.log('🎯 Configurando creación de columnas...');
-    setupColumnCreation();
-    console.log('✅ Creación de columnas configurada');
-
     console.log('🎯 Configurando interacciones de tareas...');
     setupTaskInteractions();
     console.log('✅ Interacciones de tareas configuradas');
   }, 100);
-}
-
-// Configurar la funcionalidad para crear nuevas columnas
-function setupColumnCreation() {
-  const addColumnButton = document.getElementById('add-column-button');
-  if (addColumnButton) {
-    addColumnButton.addEventListener('click', async () => {
-      const columnName = prompt('Nombre de la nueva columna:');
-      if (!columnName || columnName.trim() === '') return;
-
-      const boardRoot = document.getElementById('board-root');
-      const boardId = boardRoot?.getAttribute('data-board-id');
-
-      if (!boardId) {
-        console.error('❌ No se pudo obtener el boardId');
-        return;
-      }
-
-      try {
-        console.log('🏗️ Creando nueva columna:', columnName);
-
-        // Obtener el número de columnas actual para determinar el orden
-        const existingColumns = document.querySelectorAll('.task-list').length;
-
-        const result = await createColumn(columnName.trim(), boardId, existingColumns);
-
-        if (result.success) {
-          console.log('✅ Columna creada exitosamente');
-          // Recargar el board para mostrar la nueva columna
-          await loadBoardData(boardId);
-        } else {
-          console.error('❌ Error al crear columna:', result.error);
-          alert('Error al crear la columna');
-        }
-      } catch (error) {
-        console.error('❌ Error al crear columna:', error);
-        alert('Error al crear la columna');
-      }
-    });
-  }
 }
 
 // Configurar funcionalidad de archivados

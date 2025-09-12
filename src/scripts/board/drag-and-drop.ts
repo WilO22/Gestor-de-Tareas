@@ -8,7 +8,7 @@ import { db } from '../../firebase/client';
 // AHORA también importamos 'writeBatch' para hacer varias escrituras a la vez
 import { doc, writeBatch } from 'firebase/firestore';
 
-// EXPORTAR la función para que pueda ser usada desde board-page.ts
+// Función para manejar el final del drag & drop
 export async function handleOnEnd(event: SortableEvent) {
   // Obtenemos los elementos HTML de la columna de origen y destino
   const fromColumn = event.from as HTMLElement;

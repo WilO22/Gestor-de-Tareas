@@ -273,10 +273,10 @@
         }
         
         try {
-          // // Cerrar el modal antes de la operación
+          // Cerrar el modal antes de la operación
           deleteModal.classList.add('hidden');
-          
-          // // Llamar función global de eliminar (definida en board-page.ts)
+
+          // Llamar función global de eliminar
           if (typeof (window as any).deleteTask === 'function') {
             console.log('🔄 Llamando función deleteTask para:', taskToDelete);
             const result = await (window as any).deleteTask(taskToDelete);
@@ -405,7 +405,7 @@
           });
           
           try {
-            // // Llamar función global de restaurar columna (definida en board-page.ts)
+            // Llamar función global de restaurar columna
             if (typeof (window as any).optimizedRestoreColumn === 'function') {
               const result = await (window as any).optimizedRestoreColumn(columnId);
               console.log('✅ Resultado de restauración de columna:', result);
@@ -469,7 +469,7 @@
         if (deleteBtn) deleteBtn.style.pointerEvents = 'none';
         
         try {
-          // // Llamar función global de restaurar (definida en board-page.ts)
+          // Llamar función global de restaurar
           if (typeof (window as any).optimizedRestoreTask === 'function') {
             const result = await (window as any).optimizedRestoreTask(taskId);
             console.log('✅ Resultado de restauración:', result);
@@ -511,7 +511,7 @@
       }
     });
 
-    // Exponer funciones globalmente para uso desde board-page.ts
+    // Exponer funciones globalmente
     (window as any).showMainMenuView = showMainMenuView;
     (window as any).showArchivedTasksView = showArchivedTasksView;
     (window as any).positionDeleteModal = positionDeleteModal;

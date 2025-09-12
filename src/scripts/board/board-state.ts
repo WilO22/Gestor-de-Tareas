@@ -49,6 +49,21 @@ export function clearSelectedTasks() {
   selectedTaskElement = null;
 }
 
+export function addColumn(column: Column) {
+  currentColumns.push(column);
+}
+
+export function removeColumn(columnId: string) {
+  currentColumns = currentColumns.filter(col => col.id !== columnId);
+}
+
+export function updateColumn(columnId: string, updates: Partial<Column>) {
+  const index = currentColumns.findIndex(col => col.id === columnId);
+  if (index !== -1) {
+    currentColumns[index] = { ...currentColumns[index], ...updates };
+  }
+}
+
 export function updateScrollState(position: number, autoScroll: boolean, scrollToColumn: boolean) {
   userScrollPosition = position;
   shouldAutoScroll = autoScroll;
