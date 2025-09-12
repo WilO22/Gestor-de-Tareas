@@ -9,8 +9,8 @@ export let currentTasks: Task[] = [];
 export let realtimeUnsubscribe: (() => void) | null = null;
 export let isInitialized = false;
 
-// Estado para selección de tareas (como en Trello)
-export let selectedTaskIds: Set<string> = new Set();
+// Estado para selección de tareas (sistema simple - una tarea a la vez)
+export let selectedTaskId: string | null = null;
 export let selectedTaskElement: HTMLElement | null = null;
 
 // Control de scroll inteligente
@@ -39,13 +39,13 @@ export function setInitialized(initialized: boolean) {
   isInitialized = initialized;
 }
 
-export function updateSelectedTasks(taskIds: Set<string>, element: HTMLElement | null = null) {
-  selectedTaskIds = taskIds;
+export function updateSelectedTasks(taskId: string | null, element: HTMLElement | null = null) {
+  selectedTaskId = taskId;
   selectedTaskElement = element;
 }
 
 export function clearSelectedTasks() {
-  selectedTaskIds.clear();
+  selectedTaskId = null;
   selectedTaskElement = null;
 }
 

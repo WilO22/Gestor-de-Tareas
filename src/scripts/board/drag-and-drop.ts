@@ -62,11 +62,20 @@ export async function handleOnEnd(event: SortableEvent) {
 // Exportamos una función explícita para inicializar Sortable en las columnas renderizadas.
 // De esta forma podemos llamarla cada vez que el DOM cambie (por ejemplo, al crear columnas)
 export function initDragAndDrop() {
+  console.log('🔧 Buscando elementos .task-list...');
   const columns = document.querySelectorAll<HTMLElement>('.task-list');
-  columns.forEach((column) => {
+  console.log(`📋 Encontradas ${columns.length} columnas con clase .task-list`);
+
+  columns.forEach((column, index) => {
+    console.log(`🎯 Inicializando Sortable en columna ${index + 1}, ID: ${column.dataset.id}`);
     // Evitamos inicializar dos veces el mismo contenedor
-    if ((column as any).__sortableInitialized) return;
+    if ((column as any).__sortableInitialized) {
+      console.log(`⚠️ Columna ${index + 1} ya estaba inicializada, saltando...`);
+      return;
+    }
     (column as any).__sortableInitialized = true;
+
+    console.log(`✅ Inicializando SortableJS en columna ${index + 1}...`);
     new Sortable(column, {
       group: 'shared',
       animation: 150,
@@ -74,5 +83,8 @@ export function initDragAndDrop() {
       forceFallback: true,
       onEnd: handleOnEnd
     });
+    console.log(`🎉 SortableJS inicializado en columna ${index + 1}`);
   });
+
+  console.log('🎯 Drag & drop inicializado completamente');
 }

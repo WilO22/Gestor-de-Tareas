@@ -2,31 +2,50 @@
 //src/pages/workspace/[workspaceId]/board/[boardId].astro
 export const prerender = false;
 import Layout from '../../../../layouts/Layout.astro';
+import DashboardHeader from '../../../../components/dashboard/DashBoardHeader.astro';
 import BoardHeader from '../../../../components/board/BoardHeader.astro';
 const { workspaceId, boardId } = Astro.params;
 ---
 
 <Layout title="Tablero">
-  <main id="board-root" data-workspace-id={workspaceId} data-board-id={boardId} class="min-h-screen bg-gray-50">
-    {/* Migas de pan: el nombre del workspace se resuelve en el cliente */}
-    <div class="p-8 pb-0">
-      <div class="mb-6">
-        <a href="/dashboard" class="text-blue-500 hover:underline">Espacios de Trabajo</a>
-        <span class="text-gray-500">/</span>
-        <a id="workspace-link" href={`/workspace/${workspaceId}/boards`} class="text-blue-500 hover:underline">Cargando...</a>
-      </div>
+  <main id="board-root" data-workspace-id={workspaceId} data-board-id={boardId} class="min-h-screen bg-white">
+    {/* Cabecera del dashboard */}
+    <DashboardHeader />
 
-      {/* Título del tablero: se actualiza en el cliente al leer Firebase */}
+    {/* Título del tablero: se actualiza en el cliente al leer Firebase */}
+    <div class="p-8 pb-0">
       <h1 id="board-title" class="text-3xl font-bold mb-6 text-gray-800">Cargando tablero...</h1>
     </div>
 
     {/* Cabecera del board con buscador y opciones (similar a Trello) */}
     <BoardHeader />
 
-    {/* Contenedor de columnas. Se llena desde /src/scripts/board/board-page.ts */}
+    {/* Contenedor de columnas. Se llena desde /src/scripts/board/board-init.ts */}
     <div class="px-8">
       <div id="columns-container">
         <p class="text-gray-600">Cargando columnas...</p>
+      </div>
+    </div>
+
+    {/* Sección de Archivados */}
+    <div class="px-8 mt-8">
+      <div id="archived-section" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+            </svg>
+            Archivados
+          </h2>
+          <button id="toggle-archived-btn" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+            Mostrar archivados
+          </button>
+        </div>
+        <div id="archived-container" class="hidden bg-gray-50 rounded-lg p-4 min-h-[200px]">
+          <div id="archived-tasks" class="space-y-2">
+            <p class="text-gray-500 text-sm">No hay tareas archivadas</p>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -34,13 +53,11 @@ const { workspaceId, boardId } = Astro.params;
   {/* Inicializamos la lógica de cliente con los IDs de la ruta */}
   <!-- Script procesado: inicializador de BoardPage; IDs se leen desde data attrs del root -->
   <script>
-    import { initBoardPage } from '../../../scripts/board/board-page.ts';
-    
+    import { initBoardPage } from '@/scripts/board/board-init.ts';
+
     // Inicializar la página del board
     initBoardPage();
-  </script>
-
-  <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
+  </script>  <!-- Hacemos globales estos estilos porque los elementos (columnas/tareas)
     se generan dinámicamente en el cliente y no reciben el atributo de
     "scoping" de Astro. Con is:global aseguras que las clases de Sortable
     (.sortable-*, .blue-background-class) y .task-list apliquen correctamente. -->
@@ -70,6 +87,54 @@ const { workspaceId, boardId } = Astro.params;
   /* 3. Forzamos la "mano cerrada" ✊ también en el elemento original mientras se arrastra */
   .sortable-chosen {
     cursor: grabbing !important; /* Le damos MÁXIMA prioridad */
+  }
+
+  /* Estilos para el campo inline de agregar tarea */
+  .add-task-form {
+    animation: slideDown 0.2s ease-out;
+  }
+
+  .add-task-form .task-input {
+    transition: all 0.2s ease;
+  }
+
+  .add-task-form .task-input:focus {
+    outline: none;
+  }
+
+  .add-task-form .ring-2.ring-blue-500.ring-opacity-50 {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .add-task-submit {
+    transition: all 0.15s ease;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .add-task-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .cancel-add-task {
+    transition: all 0.15s ease;
+    border-radius: 4px;
+  }
+
+  .cancel-add-task:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   </style>

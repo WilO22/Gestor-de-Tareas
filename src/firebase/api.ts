@@ -585,21 +585,37 @@ export async function deleteWorkspace(workspaceId: string) {
 // Obtiene información específica de un tablero
 export async function fetchBoardInfo(boardId: string): Promise<Board | null> {
   try {
+    console.log('🔍 Firebase: Buscando board con ID:', boardId);
     const boardDoc = doc(db, 'boards', boardId);
     const boardSnap = await getDoc(boardDoc);
-    
+
     if (boardSnap.exists()) {
       const data = boardSnap.data();
-      return {
+      console.log('✅ Firebase: Board encontrado, datos crudos:', data);
+      console.log('📋 Firebase: Columnas en datos crudos:', data.columns);
+
+      // Obtener las columnas desde la colección separada
+      console.log('🔍 Firebase: Obteniendo columnas desde colección separada...');
+      const columns = await fetchColumns(boardId);
+      console.log('📊 Firebase: Columnas obtenidas de colección:', columns.length);
+
+      const board = {
         id: boardSnap.id,
         name: data.name ?? 'Sin nombre',
         workspaceId: data.workspaceId ?? '',
-        columns: data.columns ?? []
+        columns: columns // Usar las columnas de la colección separada
       } as Board;
+
+      console.log('📦 Firebase: Board procesado:', board);
+      console.log('📊 Firebase: Número de columnas procesadas:', board.columns?.length || 0);
+
+      return board;
     }
+
+    console.log('❌ Firebase: Board no encontrado con ID:', boardId);
     return null;
   } catch (error) {
-    console.error('Error fetching board info:', error);
+    console.error('❌ Firebase: Error fetching board info:', error);
     return null;
   }
 }
@@ -626,15 +642,42 @@ export async function fetchColumns(boardId: string): Promise<Column[]> {
   const snap = await getDocs(q);
   const cols = snap.docs.map((d) => {
     const data = d.data() as Partial<Column>;
-    return {
+    const column = {
       id: d.id,
       name: data.name ?? 'Sin nombre',
       boardId: data.boardId ?? boardId,
       order: data.order ?? 0,
+      archived: data.archived ?? false,
       tasks: []
     } as Column;
+
+    console.log(`📋 Firebase: Columna "${column.name}" - archived: ${column.archived} (tipo: ${typeof column.archived})`);
+    return column;
   });
-  return cols.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // Filtrar columnas que NO están archivadas
+  const activeColumns = cols.filter(column => {
+    const isArchived = Boolean(column.archived);
+    console.log(`🔍 Firebase: Filtrando columna "${column.name}" - archived: ${isArchived}`);
+    return !isArchived;
+  });
+  console.log('📊 Firebase: Columnas activas obtenidas:', activeColumns.length, 'de', cols.length, 'total');
+
+  // Obtener todas las tareas del board y asignarlas a sus columnas correspondientes
+  const tasks = await fetchTasks(boardId);
+  console.log('📋 Firebase: Tareas obtenidas para board:', tasks.length);
+
+  // Asignar tareas a sus columnas activas correspondientes
+  const columnsWithTasks = activeColumns.map(column => {
+    const columnTasks = tasks.filter(task => task.columnId === column.id);
+    console.log(`📋 Firebase: Columna "${column.name}" tiene ${columnTasks.length} tareas`);
+    return {
+      ...column,
+      tasks: columnTasks
+    };
+  });
+
+  return columnsWithTasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 
