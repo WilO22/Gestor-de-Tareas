@@ -1,15 +1,27 @@
---- 
-// src/components/dashboard/DashboardContainer.astro
-import WorkspacesView from './WorkspacesView.astro';
-import BoardsView from './BoardsView.astro';
 ---
-<main class="flex-1 p-8 bg-gray-50">
-  <div class="max-w-4xl">
-    <div id="workspaces-view-container">
-      <WorkspacesView />
+// src/components/dashboard/DashboardContainer.astro
+import { dashboardView } from '../../store';
+
+import WorkspacesViewIsland from './WorkspacesViewIsland.astro';
+import BoardsView from './BoardsView.astro';
+import MembersTab from './MembersTab.astro';
+import SettingsView from './SettingsView.astro';
+---
+
+<main class="flex-1 w-full min-w-0 p-0 bg-gray-50">
+  <div class="w-full h-full">
+  <!-- Eliminado: vista legacy de workspaces-view, solo usar island modular en dashboard.astro -->
+
+    <div id="boards-view" class="view hidden">
+      <BoardsView workspaceId="" />
     </div>
-    <div id="boards-view-container" class="hidden">
-      <!-- El contenido de BoardsView se renderizará aquí mediante script -->
+
+    <div id="members-view" class="view hidden">
+      <MembersTab workspaceId="" />
+    </div>
+
+    <div id="settings-view" class="view hidden">
+      <SettingsView workspaceId="" />
     </div>
   </div>
 </main>
@@ -17,25 +29,38 @@ import BoardsView from './BoardsView.astro';
 <script>
   import { dashboardView } from '../../store';
 
-  const workspacesView = document.getElementById('workspaces-view-container');
-  const boardsView = document.getElementById('boards-view-container');
+  function updateView() {
+    const { currentView, selectedWorkspaceId } = dashboardView.get();
 
-  dashboardView.subscribe(view => {
-    if (view.currentView === 'workspaces') {
-      workspacesView?.classList.remove('hidden');
-      boardsView?.classList.add('hidden');
-    } else if (view.currentView === 'boards' && view.selectedWorkspaceId) {
-      workspacesView?.classList.add('hidden');
-      boardsView?.classList.remove('hidden');
-      // Aquí necesitaríamos una forma de renderizar BoardsView con el workspaceId correcto.
-      // Dado que no podemos pasar props de Astro en el cliente, 
-      // vamos a usar un truco y notificar a otro script.
-      boardsView.innerHTML = `<div id="boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div id="boards-loading" class="col-span-full text-center text-gray-500">
-                                  Cargando tableros para ${view.selectedWorkspaceId}...
-                                </div>
-                              </div>`;
-      document.dispatchEvent(new CustomEvent('show-boards', { detail: { workspaceId: view.selectedWorkspaceId } }));
+    // Ocultar todas las vistas
+    document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+
+    // Mostrar la vista actual
+    const activeView = document.getElementById(`${currentView}-view`);
+    if (activeView) {
+      activeView.classList.remove('hidden');
+
+      // Actualizar workspaceId si es necesario
+      if (selectedWorkspaceId && (currentView === 'boards' || currentView === 'members' || currentView === 'settings')) {
+        const component = activeView.querySelector('[data-workspace-id]');
+        if (component) {
+          component.setAttribute('workspace-id', selectedWorkspaceId);
+        }
+      }
     }
+  }
+
+  // Render inicial
+  updateView();
+
+  // Escuchar cambios en el store
+  dashboardView.subscribe(() => {
+    updateView();
   });
 </script>
+
+<style>
+  .view.hidden {
+    display: none;
+  }
+</style>

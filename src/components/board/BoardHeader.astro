@@ -145,6 +145,14 @@
 <script>
   // Script para manejar el dropdown del menú y navegación entre vistas
   document.addEventListener('DOMContentLoaded', () => {
+    // Flag para evitar inicialización múltiple
+    if ((window as any).boardHeaderInitialized) {
+      console.log('ℹ️ BoardHeader ya inicializado, saltando...');
+      return;
+    }
+    (window as any).boardHeaderInitialized = true;
+    
+    console.log('🚀 Inicializando BoardHeader...');
     const menuTrigger = document.getElementById('board-menu-trigger');
     const menuDropdown = document.getElementById('board-menu-dropdown');
     const archivedTasksBtn = document.getElementById('show-archived-tasks-btn');
@@ -153,14 +161,6 @@
     const mainMenuView = document.getElementById('main-menu-view');
     const archivedTasksView = document.getElementById('archived-tasks-view');
     const backToMainBtn = document.getElementById('back-to-main-menu');
-
-    // Toggle del dropdown principal
-    menuTrigger?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      // Al abrir, siempre mostrar la vista principal primero
-      showMainMenuView();
-      menuDropdown?.classList.toggle('hidden');
-    });
 
     // Función para mostrar vista principal del menú
     function showMainMenuView() {
@@ -178,7 +178,7 @@
       const loadingElement = document.getElementById('loading-archived');
       const existingTasks = tasksList?.querySelectorAll('.archived-task-item');
       
-      // // Verificar si el único elemento es el mensaje vacío (no tareas reales)
+      // Verificar si el único elemento es el mensaje vacío (no tareas reales)
       const hasOnlyEmptyMessage = existingTasks?.length === 1 && 
                                  existingTasks[0].textContent?.includes('No hay elementos archivados');
       
@@ -191,47 +191,36 @@
                         existingTasks.length === 0 ||
                         hasOnlyEmptyMessage;
 
-      // Verbose debug logging can be toggled at runtime via window.__DEBUG__
-      if ((window as any).__DEBUG__) {
-        console.log('🔄 Verificando si debe cargar tareas archivadas:', { 
-          shouldLoad, 
-          loadingVisible: loadingElement?.style.display !== 'none',
-          existingTasksCount: existingTasks?.length || 0,
-          hasOnlyEmptyMessage: hasOnlyEmptyMessage
-        });
-      }
-      
       if (shouldLoad && typeof (window as any).loadArchivedColumnsInDropdown === 'function') {
-    if ((window as any).__DEBUG__) console.log('📥 Cargando elementos archivados (tareas y columnas)...');
-        (window as any).loadArchivedColumnsInDropdown(true); // // Forzar recarga para obtener datos frescos
-      } else {
-  if ((window as any).__DEBUG__) console.log('✋ No se necesita recargar, usando tareas existentes');
+        (window as any).loadArchivedColumnsInDropdown(true); // Forzar recarga para obtener datos frescos
       }
     }
 
-    // Cerrar dropdown al hacer click fuera
-    document.addEventListener('click', (e) => {
-      if (!menuTrigger?.contains(e.target as Node) && !menuDropdown?.contains(e.target as Node)) {
-        menuDropdown?.classList.add('hidden');
-        showMainMenuView(); // Resetear a vista principal al cerrar
-      }
+    // Toggle del dropdown principal
+    menuTrigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Al abrir, siempre mostrar la vista principal primero
+      showMainMenuView();
+      menuDropdown?.classList.toggle('hidden');
     });
 
-    // Evento para mostrar vista de elementos archivados (ya no llama al modal)
+    // Evento para mostrar vista de elementos archivados
     archivedTasksBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
+      console.log('🎯 Click en botón "Elementos archivados"');
       showArchivedTasksView();
     });
 
     // Evento para volver a la vista principal
     backToMainBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
+      console.log('🎯 Click en botón "Volver"');
       showMainMenuView();
     });
 
     // Event listeners para acciones de tareas archivadas (restaurar/eliminar)
     const archivedTasksContainer = document.getElementById('archived-tasks-container');
-  if ((window as any).__DEBUG__) console.log('🔧 Configurando event listeners para tareas archivadas:', !!archivedTasksContainer);
+    console.log('🔧 Configurando event listeners para tareas archivadas:', !!archivedTasksContainer);
     
     // // Variables para el modal dinámico de eliminación (posicionado fuera del scroll)
     const deleteModal = document.getElementById('delete-task-modal');
@@ -284,10 +273,10 @@
         }
         
         try {
-          // // Cerrar el modal antes de la operación
+          // Cerrar el modal antes de la operación
           deleteModal.classList.add('hidden');
-          
-          // // Llamar función global de eliminar (definida en board-page.ts)
+
+          // Llamar función global de eliminar
           if (typeof (window as any).deleteTask === 'function') {
             console.log('🔄 Llamando función deleteTask para:', taskToDelete);
             const result = await (window as any).deleteTask(taskToDelete);
@@ -408,12 +397,20 @@
         if (target.closest('.restore-column')) {
           e.stopPropagation();
           console.log('🔄 Intentando restaurar columna:', columnId);
+          console.log('🔍 Estado de funciones globales:', {
+            optimizedRestoreColumn: typeof (window as any).optimizedRestoreColumn,
+            showColumnDeleteModal: typeof (window as any).showColumnDeleteModal,
+            optimizedRestoreTask: typeof (window as any).optimizedRestoreTask,
+            deleteTask: typeof (window as any).deleteTask
+          });
           
           try {
-            // // Llamar función global de restaurar columna (definida en board-page.ts)
+            // Llamar función global de restaurar columna
             if (typeof (window as any).optimizedRestoreColumn === 'function') {
               const result = await (window as any).optimizedRestoreColumn(columnId);
               console.log('✅ Resultado de restauración de columna:', result);
+            } else {
+              console.error('❌ Función optimizedRestoreColumn no encontrada en window');
             }
           } catch (error) {
             console.error('❌ Error restaurando columna:', error);
@@ -425,14 +422,25 @@
         if (target.closest('.delete-column')) {
           e.stopPropagation();
           console.log('🗑️ Mostrar modal de eliminación para columna:', columnId);
+          console.log('🔍 Estado de funciones globales:', {
+            optimizedRestoreColumn: typeof (window as any).optimizedRestoreColumn,
+            showColumnDeleteModal: typeof (window as any).showColumnDeleteModal,
+            optimizedRestoreTask: typeof (window as any).optimizedRestoreTask,
+            deleteTask: typeof (window as any).deleteTask
+          });
           
           const _deleteButton = target.closest('.delete-column') as HTMLElement;
-          void _deleteButton;
           const columnName = columnCard.querySelector('span')?.textContent || 'Sin nombre';
           
-          // // Llamar función global para mostrar modal de eliminación de columna
-          if (typeof (window as any).showColumnDeleteModal === 'function') {
-            (window as any).showColumnDeleteModal(columnId, columnName);
+          try {
+            // // Llamar función global para mostrar modal de eliminación de columna
+            if (typeof (window as any).showColumnDeleteModal === 'function') {
+              (window as any).showColumnDeleteModal(columnId, columnName, _deleteButton);
+            } else {
+              console.error('❌ Función showColumnDeleteModal no encontrada en window');
+            }
+          } catch (error) {
+            console.error('❌ Error mostrando modal de eliminación:', error);
           }
           return; // // Importante: return para no procesar como tarea
         }
@@ -461,7 +469,7 @@
         if (deleteBtn) deleteBtn.style.pointerEvents = 'none';
         
         try {
-          // // Llamar función global de restaurar (definida en board-page.ts)
+          // Llamar función global de restaurar
           if (typeof (window as any).optimizedRestoreTask === 'function') {
             const result = await (window as any).optimizedRestoreTask(taskId);
             console.log('✅ Resultado de restauración:', result);
@@ -503,9 +511,81 @@
       }
     });
 
-    // Exponer funciones globalmente para uso desde board-page.ts
+    // Exponer funciones globalmente
     (window as any).showMainMenuView = showMainMenuView;
     (window as any).showArchivedTasksView = showArchivedTasksView;
     (window as any).positionDeleteModal = positionDeleteModal;
+
+    // Funciones para controlar el event listener que cierra el dropdown
+    let dropdownCloseListener: ((e: Event) => void) | null = null;
+    let isDropdownCloseListenerPaused = false;
+
+    // Función para pausar el event listener que cierra el dropdown
+    function pauseDropdownCloseListener() {
+      if (dropdownCloseListener && !isDropdownCloseListenerPaused) {
+        document.removeEventListener('click', dropdownCloseListener);
+        isDropdownCloseListenerPaused = true;
+        console.log('⏸️ Event listener de cierre de dropdown pausado');
+      }
+    }
+
+    // Función para reactivar el event listener que cierra el dropdown
+    function resumeDropdownCloseListener() {
+      if (dropdownCloseListener && isDropdownCloseListenerPaused) {
+        document.addEventListener('click', dropdownCloseListener);
+        isDropdownCloseListenerPaused = false;
+        console.log('▶️ Event listener de cierre de dropdown reactivado');
+      }
+    }
+
+    // Event listener modificado para que pueda ser pausado
+    dropdownCloseListener = (e: Event) => {
+      if (isDropdownCloseListenerPaused) {
+        console.log('⏸️ Event listener pausado, ignorando click');
+        return; // Si está pausado, no hacer nada
+      }
+      
+      const target = e.target as Element;
+      
+      // No cerrar si el click es en el botón de elementos archivados o sus hijos
+      if (target?.id === 'show-archived-tasks-btn' || target?.closest('#show-archived-tasks-btn')) {
+        console.log('🎯 Click en botón de elementos archivados, no cerrar dropdown');
+        return;
+      }
+      
+      // No cerrar si el click es en el trigger del menú
+      if (target?.id === 'board-menu-trigger' || target?.closest('#board-menu-trigger')) {
+        console.log('🎯 Click en trigger del menú, no cerrar dropdown');
+        return;
+      }
+      
+      const isClickOutside = !menuTrigger?.contains(target) && !menuDropdown?.contains(target);
+      
+      console.log('🎯 Click detectado en document:', {
+        target: target?.tagName,
+        targetId: target?.id,
+        targetClass: target?.className,
+        isClickOutside,
+        menuDropdownVisible: !menuDropdown?.classList.contains('hidden'),
+        isDropdownCloseListenerPaused,
+        menuTriggerContains: menuTrigger?.contains(target),
+        menuDropdownContains: menuDropdown?.contains(target)
+      });
+      
+      if (isClickOutside) {
+        console.log('❌ Cerrando dropdown por click fuera');
+        menuDropdown?.classList.add('hidden');
+        showMainMenuView(); // Resetear a vista principal al cerrar
+      }
+    };
+
+    // Agregar el event listener usando la función almacenada
+    document.addEventListener('click', dropdownCloseListener);
+
+    // Exponer las funciones de control del dropdown
+    (window as any).pauseDropdownCloseListener = pauseDropdownCloseListener;
+    (window as any).resumeDropdownCloseListener = resumeDropdownCloseListener;
+    
+    console.log('✅ BoardHeader inicializado completamente');
   });
 </script>

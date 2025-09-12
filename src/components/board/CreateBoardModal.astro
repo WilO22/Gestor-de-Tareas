@@ -1,0 +1,217 @@
+---
+// src/components/board/CreateBoardModal.astro
+// Modal para crear un nuevo board
+import BaseModal from '../base/BaseModal.astro';
+
+const { id = 'create-board-modal', show = false, workspaceId = '' } = Astro.props;
+---
+
+<BaseModal
+  id={id}
+  title="Crear nuevo tablero"
+  showHeader={true}
+  showFooter={false}
+  size="sm"
+  closable={true}
+  closeOnOverlay={true}
+  closeOnEscape={true}
+  animation="scale"
+  animationDuration={250}
+  ariaLabel="Crear nuevo tablero"
+  class="z-[100]"
+>
+  <form id="create-board-form" class="space-y-6" autocomplete="off">
+    <div>
+      <label for="board-name" class="block text-sm font-medium text-gray-700 mb-2">Nombre del tablero</label>
+      <input
+        id="board-name"
+        name="board-name"
+        type="text"
+        required
+        minlength="2"
+        maxlength="40"
+        class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base placeholder-gray-400 transition"
+        placeholder="Ej: Sprint 1 - Desarrollo"
+        autofocus
+      />
+    </div>
+    <div class="flex justify-end space-x-3 pt-2">
+      <button type="button" id="cancel-create-board" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+      <button type="submit" id="submit-create-board" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-semibold">Crear tablero</button>
+    </div>
+  </form>
+</BaseModal>
+
+<script>
+  console.log('🔥 CreateBoardModal: Script cargado');
+
+  // Importar funciones necesarias
+  import { createBoard } from '../../firebase/api';
+  import { getAuth } from 'firebase/auth';
+  import { app } from '../../firebase/client';
+
+  // Inicializar auth
+  const auth = getAuth(app);
+
+  // Nota: workspaceId se obtiene dinámicamente desde el DOM en el momento del envío
+
+  // Función para abrir el modal
+  function openModal() {
+    console.log('🔥 CreateBoardModal: Intentando abrir modal...');
+    const overlay = document.getElementById('create-board-modal-overlay');
+    const modal = document.getElementById('create-board-modal');
+
+    if (overlay && modal) {
+      overlay.classList.remove('hidden');
+      overlay.classList.add('opacity-100');
+      modal.classList.remove('opacity-0', 'scale-95');
+      modal.classList.add('opacity-100', 'scale-100');
+      document.body.style.overflow = 'hidden';
+
+      // Enfocar el input
+      setTimeout(() => {
+        const input = document.getElementById('board-name') as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 100);
+
+      console.log('🔥 CreateBoardModal: Modal abierto exitosamente');
+    } else {
+      console.error('🔥 CreateBoardModal: No se encontraron elementos del modal');
+    }
+  }
+
+  // Función para cerrar el modal
+  function closeModal() {
+    console.log('🔥 CreateBoardModal: Cerrando modal...');
+    const overlay = document.getElementById('create-board-modal-overlay');
+    const modal = document.getElementById('create-board-modal');
+
+    if (overlay && modal) {
+      overlay.classList.remove('opacity-100');
+      overlay.classList.add('opacity-0');
+      modal.classList.remove('opacity-100', 'scale-100');
+      modal.classList.add('opacity-0', 'scale-95');
+
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        document.body.style.overflow = '';
+      }, 300);
+    }
+  }
+
+  // Esperar a que el DOM esté listo
+  function initModal() {
+    console.log('🔥 CreateBoardModal: Inicializando modal...');
+
+    // Escuchar el evento para abrir el modal
+    document.addEventListener('create-board-requested', () => {
+      console.log('🔥 CreateBoardModal: Evento recibido, abriendo modal...');
+      openModal();
+    });
+
+    // Configurar el botón de cancelar
+    document.addEventListener('click', (e) => {
+      if (e.target && (e.target as HTMLElement).id === 'cancel-create-board') {
+        closeModal();
+      }
+    });
+
+    // Configurar el formulario
+    document.addEventListener('submit', async (e) => {
+      if (e.target && (e.target as HTMLElement).id === 'create-board-form') {
+        e.preventDefault();
+        console.log('🔥 CreateBoardModal: Formulario enviado');
+
+        const input = document.getElementById('board-name') as HTMLInputElement;
+        const submitBtn = document.getElementById('submit-create-board') as HTMLButtonElement;
+
+        if (input && submitBtn) {
+          const name = input.value.trim();
+
+          if (name.length < 2) {
+            input.focus();
+            input.classList.add('ring-2', 'ring-red-400');
+            return;
+          }
+
+          input.classList.remove('ring-2', 'ring-red-400');
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Creando...';
+
+          try {
+            // Obtener workspaceId desde el elemento boards-grid
+            const boardsGrid = document.getElementById('boards-grid');
+            const workspaceId = boardsGrid?.getAttribute('data-workspace-id');
+
+            console.log('🔥 CreateBoardModal: WorkspaceId obtenido desde DOM:', workspaceId);
+
+            if (!workspaceId) {
+              console.error('🔥 CreateBoardModal: No se pudo obtener workspaceId desde boards-grid');
+              (window as any).showToast({
+                message: 'No se pudo identificar el workspace',
+                type: 'error'
+              });
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Crear tablero';
+              return;
+            }
+
+            console.log('🔥 CreateBoardModal: Creando board:', name, 'en workspace:', workspaceId);
+
+            // Crear board usando la API
+            const result = await createBoard(name, workspaceId);
+
+            if (result.success) {
+              console.log('🔥 CreateBoardModal: Board creado exitosamente con ID:', result.id);
+              closeModal();
+              input.value = '';
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Crear tablero';
+
+              // Board creado exitosamente - mostrar toast
+              (window as any).showToast({
+                message: 'Tablero creado exitosamente',
+                type: 'success'
+              });
+
+              // Emitir evento para recargar la lista de boards
+              console.log('🔥 CreateBoardModal: Emitiendo evento board-created...');
+              document.dispatchEvent(new CustomEvent('board-created', {
+                detail: { boardId: result.id, workspaceId: workspaceId }
+              }));
+            } else {
+              console.error('🔥 CreateBoardModal: Error creando board:', result.error);
+              (window as any).showToast({
+                message: 'Error al crear tablero: ' + (result.error || 'Error desconocido'),
+                type: 'error'
+              });
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Crear tablero';
+            }
+
+          } catch (error) {
+            console.error('🔥 CreateBoardModal: Error:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+            (window as any).showToast({
+              message: 'Error al crear tablero: ' + errorMessage,
+              type: 'error'
+            });
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Crear tablero';
+          }
+        }
+      }
+    });
+
+    console.log('🔥 CreateBoardModal: Event listeners configurados');
+  }
+
+  // Inicializar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initModal);
+  } else {
+    initModal();
+  }
+</script>

@@ -4,6 +4,8 @@ import { db } from './client';
 import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, writeBatch } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 import type { Column, Task, Board, Workspace, Member, User } from '../types/domain';
+import { auth } from './auth';
+import { findUserByEmail } from './users';
 // // ELIMINADO: import { updateUserWorkspaces } from './users'; - ya no es necesario
 
 // ============================================================================
@@ -77,12 +79,11 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Member[]
 
 // Función para crear un nuevo workspace
 export async function createWorkspace(name: string, ownerId: string) {
-  console.log('🏗️ Creando workspace:', { name, ownerId });
+  console.log('🏗️ API createWorkspace: Function called with:', { name, ownerId });
   
   try {
     // // MEJORADO: Obtener información real del usuario propietario desde Firebase Auth
-    const auth = await import('./auth');
-    const currentUser = auth.auth.currentUser;
+    const currentUser = auth.currentUser;
     
     if (!currentUser) {
       console.error('❌ No hay usuario autenticado');
@@ -584,21 +585,37 @@ export async function deleteWorkspace(workspaceId: string) {
 // Obtiene información específica de un tablero
 export async function fetchBoardInfo(boardId: string): Promise<Board | null> {
   try {
+    console.log('🔍 Firebase: Buscando board con ID:', boardId);
     const boardDoc = doc(db, 'boards', boardId);
     const boardSnap = await getDoc(boardDoc);
-    
+
     if (boardSnap.exists()) {
       const data = boardSnap.data();
-      return {
+      console.log('✅ Firebase: Board encontrado, datos crudos:', data);
+      console.log('📋 Firebase: Columnas en datos crudos:', data.columns);
+
+      // Obtener las columnas desde la colección separada
+      console.log('🔍 Firebase: Obteniendo columnas desde colección separada...');
+      const columns = await fetchColumns(boardId);
+      console.log('📊 Firebase: Columnas obtenidas de colección:', columns.length);
+
+      const board = {
         id: boardSnap.id,
         name: data.name ?? 'Sin nombre',
         workspaceId: data.workspaceId ?? '',
-        columns: data.columns ?? []
+        columns: columns // Usar las columnas de la colección separada
       } as Board;
+
+      console.log('📦 Firebase: Board procesado:', board);
+      console.log('📊 Firebase: Número de columnas procesadas:', board.columns?.length || 0);
+
+      return board;
     }
+
+    console.log('❌ Firebase: Board no encontrado con ID:', boardId);
     return null;
   } catch (error) {
-    console.error('Error fetching board info:', error);
+    console.error('❌ Firebase: Error fetching board info:', error);
     return null;
   }
 }
@@ -625,15 +642,42 @@ export async function fetchColumns(boardId: string): Promise<Column[]> {
   const snap = await getDocs(q);
   const cols = snap.docs.map((d) => {
     const data = d.data() as Partial<Column>;
-    return {
+    const column = {
       id: d.id,
       name: data.name ?? 'Sin nombre',
       boardId: data.boardId ?? boardId,
       order: data.order ?? 0,
+      archived: data.archived ?? false,
       tasks: []
     } as Column;
+
+    console.log(`📋 Firebase: Columna "${column.name}" - archived: ${column.archived} (tipo: ${typeof column.archived})`);
+    return column;
   });
-  return cols.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // Filtrar columnas que NO están archivadas
+  const activeColumns = cols.filter(column => {
+    const isArchived = Boolean(column.archived);
+    console.log(`🔍 Firebase: Filtrando columna "${column.name}" - archived: ${isArchived}`);
+    return !isArchived;
+  });
+  console.log('📊 Firebase: Columnas activas obtenidas:', activeColumns.length, 'de', cols.length, 'total');
+
+  // Obtener todas las tareas del board y asignarlas a sus columnas correspondientes
+  const tasks = await fetchTasks(boardId);
+  console.log('📋 Firebase: Tareas obtenidas para board:', tasks.length);
+
+  // Asignar tareas a sus columnas activas correspondientes
+  const columnsWithTasks = activeColumns.map(column => {
+    const columnTasks = tasks.filter(task => task.columnId === column.id);
+    console.log(`📋 Firebase: Columna "${column.name}" tiene ${columnTasks.length} tareas`);
+    return {
+      ...column,
+      tasks: columnTasks
+    };
+  });
+
+  return columnsWithTasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 
@@ -675,8 +719,7 @@ export async function addMemberToWorkspaceByEmail(
   role: 'admin' | 'member' = 'member'
 ): Promise<{ success: boolean; error?: any; member?: Member }> {
   try {
-    // // MEJORADO: Importar y usar función de búsqueda de usuarios
-    const { findUserByEmail } = await import('./users');
+    // // MEJORADO: Usar función de búsqueda de usuarios importada estáticamente
     
     // // Buscar usuario real por email
     const user = await findUserByEmail(userEmail);
@@ -909,11 +952,16 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
   // // Función para procesar cambios y llamar callback cuando tengamos todos los datos
   const processAndCallback = () => {
     completedSubscriptions++;
-    if (completedSubscriptions === 2) { // Esperamos 2 suscripciones
-      const workspaces = Array.from(allWorkspaces.values());
-      console.log('✅ Workspaces cargados correctamente (propios + miembro):', workspaces.length);
-      callback(workspaces);
-      completedSubscriptions = 0; // Reset para siguientes cambios
+    console.log('🔄 Progreso de suscripciones:', completedSubscriptions, 'de 2');
+
+    // Llamar callback inmediatamente cuando tengamos datos, no esperar a las 2 suscripciones
+    const workspaces = Array.from(allWorkspaces.values());
+    console.log('✅ Workspaces actualizados:', workspaces.length);
+    callback(workspaces);
+
+    // Reset para siguientes cambios solo si hemos completado ambas
+    if (completedSubscriptions === 2) {
+      completedSubscriptions = 0;
     }
   };
 
@@ -922,14 +970,14 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
     query(collection(db, 'workspaces'), where('ownerId', '==', userId)),
     (snapshot) => {
       console.log('📊 Workspaces propios encontrados:', snapshot.docs.length);
-      
+
       // // Remover workspaces propios anteriores del mapa
       for (const [key, workspace] of allWorkspaces.entries()) {
         if (workspace.ownerId === userId) {
           allWorkspaces.delete(key);
         }
       }
-      
+
       // // Agregar workspaces propios actualizados
       snapshot.docs.forEach(d => {
         const data = d.data();
@@ -944,7 +992,8 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
           updatedAt: data.updatedAt?.toDate?.() ?? new Date()
         } as Workspace);
       });
-      
+
+      console.log('🔄 Llamando processAndCallback desde owner subscription');
       processAndCallback();
     },
     (error) => {
@@ -993,10 +1042,12 @@ export function subscribeToUserWorkspaces(userId: string, callback: (workspaces:
         }
       }
       
+      console.log('🔄 Llamando processAndCallback desde member subscription');
       processAndCallback();
     },
     (error) => {
       console.error('❌ Error en suscripción de membresías:', error);
+      console.log('🔄 Llamando processAndCallback desde member subscription (error)');
       processAndCallback(); // Continuar aunque falle esta suscripción
     }
   );
