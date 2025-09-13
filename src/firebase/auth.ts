@@ -5,8 +5,7 @@ import {
   getAuth, // El servicio de autenticación
   createUserWithEmailAndPassword, // La función para crear nuevos usuarios
   signInWithEmailAndPassword,
-  updateProfile, // Para actualizar el perfil del usuario
-  onAuthStateChanged // Para escuchar cambios en el estado de autenticación
+  updateProfile // Para actualizar el perfil del usuario
 } from "firebase/auth";
 
 // Importamos la 'app' que ya inicializamos en nuestro otro archivo de firebase
@@ -62,6 +61,7 @@ export async function signIn(email: string, password: string) {
     // Usamos la herramienta de Firebase para iniciar sesión
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log("¡Inicio de sesión exitoso!", userCredential.user);
+    console.log("🔥 Usuario autenticado:", userCredential.user.uid, userCredential.user.email);
     return { success: true, user: userCredential.user };
   } catch (error) {
     // Si algo sale mal (ej: contraseña incorrecta), lo capturamos
@@ -74,5 +74,5 @@ export async function signIn(email: string, password: string) {
   }
 }
 
-// Re-exportar onAuthStateChanged para uso en componentes del cliente
-export { onAuthStateChanged, getAuth };
+// Re-exportar funciones necesarias para uso en componentes del cliente
+export { onAuthStateChanged, getAuth } from 'firebase/auth';

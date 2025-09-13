@@ -23,8 +23,8 @@ function readDataset() {
   return { workspaceId, currentUserId, currentUserRole, canManageMembers };
 }
 
-export function initializeMembersManagementIsland() {
-  const { workspaceId, currentUserId: _currentUserId, canManageMembers } = readDataset();
+function initializeMembersManagementIsland() {
+  const { workspaceId, currentUserId, currentUserRole, canManageMembers } = readDataset();
 
   console.log('🏝️ MembersManagementIsland: Hidratando en cliente para workspace', workspaceId);
 
@@ -161,7 +161,7 @@ export function initializeMembersManagementIsland() {
     }
     elements.membersEmpty?.classList.add('hidden');
     const membersHTML = members.map(member => {
-    const isCurrentUser = member.userId === (document.body.dataset.currentUserId || '');
+    const isCurrentUser = member.userId === currentUserId;
       const canManageThisMember = canManageMembers && !isCurrentUser && member.role !== 'owner';
       return `
         <div class="member-item flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors" data-member-id="${member.userId}">
@@ -230,47 +230,131 @@ export function initializeMembersManagementIsland() {
   }
 
   async function loadData() {
-    if (!workspaceId) return;
+    if (!workspaceId) {
+      console.warn('⚠️ loadData: No hay workspaceId disponible');
+      return;
+    }
+
     try {
+      console.log('🔄 Cargando datos de miembros para workspace:', workspaceId);
       state.loading = true;
+      state.error = null;
+
+      // Cargar miembros
+      const { getWorkspaceMembers } = await import('../../firebase/api');
       const members = await getWorkspaceMembers(workspaceId);
-      state.activeMembers = members;
-      if (canManageMembers) {
-        const invitations = await getWorkspaceInvitations(workspaceId);
-        state.pendingInvitations = invitations;
+      console.log('✅ Miembros cargados:', members.length);
+
+      // Si no hay miembros pero somos miembros del workspace, agregar al usuario actual
+      if (members.length === 0 && currentUserId) {
+        console.log('🔄 No hay miembros, intentando agregar usuario actual');
+        try {
+          const { auth } = await import('../../firebase/auth');
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            const currentMember: Member = {
+              userId: currentUserId,
+              email: currentUser.email || '',
+              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Usuario',
+              role: (currentUserRole as 'member' | 'owner' | 'admin') || 'member',
+              joinedAt: new Date()
+            };
+            members.push(currentMember);
+            console.log('✅ Usuario actual agregado como miembro');
+          }
+        } catch (userError) {
+          console.warn('⚠️ No se pudo agregar usuario actual:', userError);
+        }
       }
-      state.loading = false; state.error = null;
+
+      // Cargar invitaciones si el usuario puede gestionar miembros
+      let invitations: any[] = [];
+      if (canManageMembers) {
+        console.log('🔄 Loading invitations for workspace:', workspaceId);
+        try {
+          const { getWorkspaceInvitations } = await import('../../firebase/invitations');
+          invitations = await getWorkspaceInvitations(workspaceId);
+          console.log('✅ Invitations loaded:', invitations.length);
+        } catch (invitationsError) {
+          console.warn('⚠️ Could not load invitations:', invitationsError);
+          invitations = [];
+        }
+      }
+
+      // Actualizar estado
+      state.activeMembers = members;
+      state.pendingInvitations = invitations;
+      state.loading = false;
+
+      // Renderizar
       renderMembers(state.activeMembers);
-      if (canManageMembers) renderInvitations(state.pendingInvitations);
+      renderInvitations(state.pendingInvitations);
       updateCounters();
+
+      console.log('🎉 Members data loaded successfully');
     } catch (error) {
-      console.error('🏝️ MembersManagementIsland: Error cargando datos:', error);
-      state.loading = false; state.error = 'Error al cargar los datos de miembros';
-      showToast('Error al cargar los datos de miembros', 'error');
+      console.error('❌ Error loading members data:', error);
+      state.loading = false;
+      state.error = 'Error al cargar los datos de miembros';
+
+      // Intentar fallback: mostrar al menos al usuario actual si es posible
+      if (currentUserId) {
+        try {
+          const { auth } = await import('../../firebase/auth');
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            const fallbackMember: Member = {
+              userId: currentUserId,
+              email: currentUser.email || '',
+              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Usuario',
+              role: (currentUserRole as 'member' | 'owner' | 'admin') || 'member',
+              joinedAt: new Date()
+            };
+            state.activeMembers = [fallbackMember];
+            renderMembers(state.activeMembers);
+            updateCounters();
+            console.log('✅ Fallback: Mostrando usuario actual como miembro');
+          }
+        } catch (fallbackError) {
+          console.warn('⚠️ Fallback también falló:', fallbackError);
+        }
+      }
+
+      showToast('Error al cargar los miembros del workspace', 'error');
     }
   }
 
-  function initializeMembersManagementIsland() {
-    elements.membersTab?.addEventListener('click', () => switchTab('members'));
-    elements.invitationsTab?.addEventListener('click', () => switchTab('invitations'));
-    elements.inviteBtn?.addEventListener('click', handleInviteMember);
+  // Inicializar event listeners
+  elements.membersTab?.addEventListener('click', () => switchTab('members'));
+  elements.invitationsTab?.addEventListener('click', () => switchTab('invitations'));
+  elements.inviteBtn?.addEventListener('click', handleInviteMember);
 
-    onAuthStateChanged(auth, (user) => {
-      state.currentUser = user;
-      if (user) {
-        loadData();
-      } else {
-        state.activeMembers = []; state.pendingInvitations = []; renderMembers([]); if (canManageMembers) renderInvitations([]); updateCounters();
-      }
-    });
-  }
+  // Escuchar cambios de autenticación
+  onAuthStateChanged(auth, (user) => {
+    state.currentUser = user;
+    if (user) {
+      console.log('🔥 onAuthStateChanged: Usuario autenticado, cargando datos...');
+      loadData();
+    } else {
+      console.log('🔥 onAuthStateChanged: Usuario no autenticado, limpiando datos...');
+      state.activeMembers = [];
+      state.pendingInvitations = [];
+      renderMembers([]);
+      if (canManageMembers) renderInvitations([]);
+      updateCounters();
+    }
+  });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeMembersManagementIsland);
+  // Verificar si ya hay un usuario autenticado al inicializar
+  if (auth.currentUser) {
+    console.log('🔥 Inicialización: Usuario ya autenticado, cargando datos inmediatamente...');
+    state.currentUser = auth.currentUser;
+    loadData();
   } else {
-    initializeMembersManagementIsland();
+    console.log('🔥 Inicialización: Esperando autenticación...');
   }
 
+  // Exponer funciones globalmente para debugging
   (window as any).membersManagementIsland = {
     state: () => state,
     loadData,
@@ -279,9 +363,15 @@ export function initializeMembersManagementIsland() {
   };
 }
 
-// Auto-initialize if script is loaded after DOM ready
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeMembersManagementIsland);
+} else {
+  initializeMembersManagementIsland();
+}
+
+// Auto-inicializar si el script se carga después de que el DOM esté listo
 if (document.readyState !== 'loading') {
-  // find element to decide whether to initialize automatically
   if (document.getElementById('members-management-view')) {
     initializeMembersManagementIsland();
   }

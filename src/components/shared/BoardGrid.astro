@@ -1,0 +1,29 @@
+---
+// src/components/shared/BoardGrid.astro
+export interface Props {
+  workspaceId: string;
+  showCreateCard?: boolean;
+  gridId?: string;
+  enableRealTime?: boolean;
+}
+
+const {
+  workspaceId,
+  showCreateCard = true,
+  gridId = 'boards-grid',
+  enableRealTime = false
+} = Astro.props;
+---
+
+<div id={gridId} class="grid gap-12 w-full grid-cols-[repeat(auto-fit,minmax(260px,1fr))]" data-workspace-id={workspaceId}>
+  <p id="loading-message" class="col-span-full text-center py-16">Cargando tableros...</p>
+</div>
+
+<script define:vars={{ gridId, workspaceId, showCreateCard, enableRealTime }}>
+  import { initBoardGrid } from '../../scripts/shared/board-grid';
+
+  // Inicializar cuando el componente se monta
+  document.addEventListener('DOMContentLoaded', () => {
+    initBoardGrid(gridId, workspaceId, showCreateCard, enableRealTime);
+  });
+</script>

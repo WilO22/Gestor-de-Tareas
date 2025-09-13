@@ -1,16 +1,119 @@
 ---
 // src/components/dashboard/BoardsView.astro
+
 export interface Props {
-  workspaceId: string;
+  workspaceId?: string;
 }
 const { workspaceId } = Astro.props;
 ---
-<div>
+
+<div id="boards-content">
   <div class="flex items-center space-x-4 mb-8">
-     </div>
-  <div id="boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <div id="boards-loading" class="col-span-full text-center text-gray-500">
-      Cargando tableros...
-    </div>
+  </div>
+  <div id="boards-view-grid" class="grid gap-12 w-full grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+    <p id="loading-message" class="col-span-full text-center py-16">Cargando tableros...</p>
   </div>
 </div>
+
+<script>
+  console.log('📋 BoardsView: Componente actualizado cargado');
+
+  // Función de inicialización
+  async function initializeComponent() {
+    console.log('📋 BoardsView: Inicializando componente...');
+
+    // Importar dinámicamente el store
+    const { dashboardView } = await import('../../store/store');
+
+    // Escuchar cambios en el store
+    const unsubscribe = dashboardView.subscribe((state) => {
+      console.log('📋 BoardsView: Dashboard store cambió:', state);
+      handleStoreChange(state);
+    });
+
+    // Verificar estado inicial
+    const initialState = dashboardView.get();
+    console.log('📋 BoardsView: Estado inicial del store:', initialState);
+    await handleStoreChange(initialState);
+
+    console.log('📋 BoardsView: Componente inicializado completamente');
+
+    // Retornar función de cleanup
+    return unsubscribe;
+  }
+
+  // Función para manejar cambios en el store
+  async function handleStoreChange(state: { currentView: string; selectedWorkspaceId: string | null }) {
+    console.log('📋 BoardsView: === handleStoreChange INICIADO ===');
+    console.log('📋 BoardsView: Estado recibido:', JSON.stringify(state, null, 2));
+
+    if (state.currentView === 'boards' && state.selectedWorkspaceId) {
+      console.log('📋 BoardsView: ✅ Condición cumplida - currentView=boards, selectedWorkspaceId=', state.selectedWorkspaceId);
+
+      // Asegurarse de que el contenedor del grid existe
+      let gridContainer = document.getElementById('boards-view-grid');
+      if (!gridContainer) {
+        console.log('📋 BoardsView: Creando contenedor del grid...');
+        const content = document.getElementById('boards-content');
+        if (content) {
+          const gridDiv = document.createElement('div');
+          gridDiv.id = 'boards-view-grid';
+          gridDiv.className = 'grid gap-12 w-full grid-cols-[repeat(auto-fit,minmax(260px,1fr))]';
+          gridDiv.innerHTML = '<p id="loading-message" class="col-span-full text-center py-16">Cargando tableros...</p>';
+          content.appendChild(gridDiv);
+          gridContainer = gridDiv;
+          console.log('📋 BoardsView: ✅ Contenedor creado exitosamente');
+        } else {
+          console.error('❌ BoardsView: No se encontró el elemento boards-content');
+          return;
+        }
+      } else {
+        console.log('📋 BoardsView: ✅ Contenedor ya existe');
+      }
+
+      try {
+        console.log('📋 BoardsView: Importando módulo board-grid...');
+        // Importar y usar el módulo TypeScript
+        const { initBoardGrid } = await import('../../scripts/shared/board-grid');
+        console.log('📋 BoardsView: ✅ Módulo importado, llamando initBoardGrid...');
+
+        const cleanup = await initBoardGrid('boards-view-grid', state.selectedWorkspaceId, true, true);
+        console.log('📋 BoardsView: ✅ initBoardGrid completado, cleanup:', !!cleanup);
+
+        if (cleanup) {
+          // Guardar referencia para cleanup si es necesario
+          (window as any)._boardsViewCleanup = cleanup;
+          console.log('📋 BoardsView: ✅ Cleanup guardado');
+        }
+      } catch (error) {
+        console.error('❌ BoardsView: Error al importar o ejecutar initBoardGrid:', error);
+      }
+    } else {
+      console.log('📋 BoardsView: ❌ Condición NO cumplida - currentView:', state.currentView, 'selectedWorkspaceId:', state.selectedWorkspaceId);
+      // Si no estamos en la vista de boards, limpiar
+      if (state.currentView !== 'boards') {
+        console.log('📋 BoardsView: Limpiando estado anterior...');
+        if ((window as any)._boardsViewCleanup) {
+          (window as any)._boardsViewCleanup();
+          (window as any)._boardsViewCleanup = null;
+          console.log('📋 BoardsView: ✅ Cleanup ejecutado');
+        }
+        // Limpiar el contenido del grid
+        const gridContainer = document.getElementById('boards-view-grid');
+        if (gridContainer) {
+          gridContainer.innerHTML = '<p id="loading-message" class="col-span-full text-center py-16">Selecciona un workspace para ver sus tableros...</p>';
+          console.log('📋 BoardsView: ✅ Contenedor limpiado');
+        }
+      }
+    }
+
+    console.log('📋 BoardsView: === handleStoreChange COMPLETADO ===');
+  }
+
+  // Inicializar
+  console.log('📋 BoardsView: Iniciando inicialización...');
+  initializeComponent().then(cleanup => {
+    // Guardar cleanup function si es necesario
+    (window as any)._boardsViewCleanup = cleanup;
+  });
+</script>

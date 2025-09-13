@@ -3,7 +3,7 @@
 // Componente lazy para la sección de miembros
 ---
 
-<div id="members-content" class="tab-content hidden">
+<div id="members-content" class="tab-content">
   <div class="mb-6">
     <div class="flex items-center justify-between">
       <h3 class="text-lg font-semibold text-gray-800">Miembros del Espacio de Trabajo</h3>
@@ -36,66 +36,226 @@
 <script>
   // Script específico para la gestión de miembros
   import { subscribeToWorkspaceMembers } from '../../firebase/api';
+  import { onAuthStateChanged, auth } from '../../firebase/auth';
+  import { dashboardView } from '../../store/store';
 
   let membersUnsubscribe: any = null;
+  let currentWorkspaceId: string = '';
+  let currentUser: any = null;
+
+  // Función para mostrar mensajes de error usando el sistema de toast
+  function showErrorMessage(message: string, isError: boolean = true) {
+    console.error('❌ MembersTab Error:', message);
+
+    // Intentar usar el sistema de toast si está disponible
+    if (typeof (window as any).showToast === 'function') {
+      (window as any).showToast({
+        message: message,
+        type: isError ? 'error' : 'warning',
+        duration: 5000
+      });
+    } else {
+      // Fallback: mostrar alert
+      alert(message);
+    }
+  }
+
+  // Función para mostrar mensajes de éxito
+  function showSuccessMessage(message: string) {
+    console.log('✅ MembersTab Success:', message);
+
+    // Intentar usar el sistema de toast si está disponible
+    if (typeof (window as any).showToast === 'function') {
+      (window as any).showToast({
+        message: message,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  }
+
+  // Función para manejar visibilidad del componente
+  function handleVisibility(state: any) {
+    console.log('👥 MembersTab: handleVisibility llamado con estado:', state);
+
+    if (state.currentView === 'members' && state.selectedWorkspaceId) {
+      console.log('👥 MembersTab: Vista de miembros activa para workspace:', state.selectedWorkspaceId);
+      // El contenedor padre ya debería estar visible, solo necesitamos cargar los miembros
+      if (state.selectedWorkspaceId !== currentWorkspaceId) {
+        console.log('👥 MembersTab: Cargando miembros para nuevo workspace:', state.selectedWorkspaceId);
+        loadWorkspaceMembers(state.selectedWorkspaceId);
+      }
+    } else {
+      console.log('👥 MembersTab: Vista de miembros inactiva');
+      // No necesitamos ocultar nada aquí, el contenedor padre se encarga de eso
+    }
+  }
+
+  // Esperar a que el DOM esté listo
+  function initializeComponent() {
+    // Suscribirse a cambios del store para manejar visibilidad
+    dashboardView.subscribe((state) => {
+      console.log('� MembersTab: Dashboard store cambió:', state);
+      handleVisibility(state);
+    });
+
+    // Verificar estado inicial
+    const initialState = dashboardView.get();
+    console.log('� MembersTab: Estado inicial del store:', initialState);
+    handleVisibility(initialState);
+  }
+
+  // Inicializar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeComponent);
+  } else {
+    initializeComponent();
+  }
 
   // Función para cargar miembros del workspace
   function loadWorkspaceMembers(workspaceId: string) {
-    if (!workspaceId) return;
+    console.log('🚀 loadWorkspaceMembers llamada con workspaceId:', workspaceId);
+
+    if (!workspaceId) {
+      console.error('❌ No workspaceId provided to loadWorkspaceMembers');
+      showErrorMessage('Error: No se especificó un workspace válido', false);
+      return;
+    }
+
+    // Verificar si el usuario está autenticado
+    if (!currentUser) {
+      console.log('🔒 Usuario no autenticado, mostrando mensaje de autenticación');
+      showErrorMessage('Debes iniciar sesión para ver los miembros del workspace. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión</a>', false);
+      return;
+    }
+
+    // Si es el mismo workspaceId, no recargar
+    if (currentWorkspaceId === workspaceId) {
+      console.log('🔄 Mismo workspaceId, no recargando');
+      return;
+    }
+
+    currentWorkspaceId = workspaceId;
+    console.log('🔄 Cargando miembros para workspace:', workspaceId, 'usuario:', currentUser.uid);
 
     // Limpiar suscripción anterior
     if (membersUnsubscribe) {
+      console.log('🧹 Limpiando suscripción anterior');
       membersUnsubscribe();
+      membersUnsubscribe = null;
+    }
+
+    // Mostrar loading
+    const membersList = document.getElementById('members-list');
+    if (membersList) {
+      membersList.innerHTML = `
+        <div class="text-center text-gray-500 py-8">
+          <svg class="animate-spin h-8 w-8 mx-auto mb-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Cargando miembros...
+        </div>
+      `;
     }
 
     // Suscribirse a cambios en miembros
-    membersUnsubscribe = subscribeToWorkspaceMembers(workspaceId, (members) => {
-      renderMembers(members);
-    });
+    try {
+      console.log('📡 Suscribiéndose a cambios de miembros para workspace:', workspaceId);
+      membersUnsubscribe = subscribeToWorkspaceMembers(workspaceId, (members) => {
+        console.log('📊 Miembros recibidos para workspace', workspaceId, ':', members.length, 'miembros');
+        if (members && members.length > 0) {
+          console.log('✅ Miembros válidos recibidos, renderizando...');
+          renderMembers(members);
+        } else {
+          console.log('⚠️ No se recibieron miembros o lista vacía');
+          renderMembers([]);
+        }
+      });
+      console.log('✅ Suscripción a miembros configurada correctamente');
+    } catch (error) {
+      console.error('❌ Error al configurar suscripción a miembros:', error);
+      showErrorMessage('Error al cargar los miembros. Inténtalo de nuevo.', true);
+      return;
+    }
+
+    // Configurar timeout para detectar si no se reciben datos
+    setTimeout(() => {
+      const membersList = document.getElementById('members-list');
+      if (membersList && membersList.innerHTML.includes('Cargando miembros')) {
+        console.warn('⚠️ Timeout: No se recibieron datos de miembros después de 10 segundos para workspace:', workspaceId);
+        showErrorMessage('La carga de miembros está tardando más de lo esperado. Puede ser un problema de conexión o permisos.', true);
+      }
+    }, 10000);
   }
+
+  // Función showErrorMessage eliminada - ahora usa el sistema de toast global
+  // La función duplicada fue removida para evitar conflictos
 
   // Función para renderizar lista de miembros
   function renderMembers(members: any[]) {
+    console.log('🎨 Renderizando miembros:', members?.length || 0, 'miembros');
+    
     const membersList = document.getElementById('members-list');
-    if (!membersList) return;
+    if (!membersList) {
+      console.error('❌ No se encontró el elemento members-list');
+      return;
+    }
 
-    if (members.length === 0) {
+    if (!members || members.length === 0) {
+      console.log('📭 No hay miembros para mostrar');
       membersList.innerHTML = `
         <div class="text-center text-gray-500 py-8">
-          <p>No hay miembros en este workspace</p>
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75"></path>
+          </svg>
+          <p class="text-sm">No hay miembros en este workspace</p>
+          <p class="text-xs text-gray-400 mt-1">Los miembros aparecerán aquí cuando sean agregados</p>
         </div>
       `;
       return;
     }
 
-    membersList.innerHTML = members.map(member => `
-      <div class="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-            ${member.displayName?.charAt(0)?.toUpperCase() || member.email?.charAt(0)?.toUpperCase() || 'U'}
+    console.log('✅ Renderizando', members.length, 'miembros');
+    membersList.innerHTML = members.map(member => {
+      const displayName = member.displayName || member.email?.split('@')[0] || 'Usuario';
+      const email = member.email || '';
+      const role = member.role || 'member';
+      const initials = displayName.charAt(0).toUpperCase();
+
+      console.log('👤 Renderizando miembro:', { displayName, email, role });
+
+      return `
+        <div class="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+              ${initials}
+            </div>
+            <div>
+              <p class="font-medium text-gray-900">${displayName}</p>
+              <p class="text-sm text-gray-600">${email}</p>
+            </div>
           </div>
-          <div>
-            <p class="font-medium text-gray-900">${member.displayName || 'Usuario'}</p>
-            <p class="text-sm text-gray-600">${member.email}</p>
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-1 text-xs font-medium rounded-full ${
+              role === 'owner' ? 'bg-purple-100 text-purple-800' :
+              role === 'admin' ? 'bg-blue-100 text-blue-800' :
+              'bg-gray-100 text-gray-800'
+            }">
+              ${role === 'owner' ? 'Propietario' :
+                role === 'admin' ? 'Administrador' : 'Miembro'}
+            </span>
+            <button class="text-gray-400 hover:text-gray-600 p-1 rounded" title="Opciones">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"></path>
+              </svg>
+            </button>
           </div>
         </div>
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs font-medium rounded-full ${
-            member.role === 'owner' ? 'bg-purple-100 text-purple-800' :
-            member.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-            'bg-gray-100 text-gray-800'
-          }">
-            ${member.role === 'owner' ? 'Propietario' :
-              member.role === 'admin' ? 'Administrador' : 'Miembro'}
-          </span>
-          <button class="text-gray-400 hover:text-gray-600 p-1 rounded" title="Opciones">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
+
+    console.log('✅ Miembros renderizados exitosamente');
   }
 
   // Función para invitar miembros
@@ -103,6 +263,112 @@
     console.log('🎯 Invitando miembro:', email);
     // Implementar lógica de invitación
   }
+
+  // Escuchar cambios de workspace desde el store del dashboard
+  function setupDashboardStoreListener() {
+    // Suscribirse a cambios en el store del dashboard
+    const unsubscribe = dashboardView.subscribe((state) => {
+      console.log('📡 Dashboard store cambió:', state);
+      
+      // Solo procesar si estamos en la vista de miembros
+      if (state.currentView === 'members' && state.selectedWorkspaceId) {
+        console.log('👥 Vista de miembros seleccionada, cargando workspace:', state.selectedWorkspaceId);
+        loadWorkspaceMembers(state.selectedWorkspaceId);
+      }
+    });
+
+    // Verificar estado inicial
+    const initialState = dashboardView.get();
+    if (initialState.currentView === 'members' && initialState.selectedWorkspaceId) {
+      console.log('� Estado inicial: vista de miembros con workspace:', initialState.selectedWorkspaceId);
+      loadWorkspaceMembers(initialState.selectedWorkspaceId);
+    }
+
+    return unsubscribe;
+  }
+
+  // Configurar listener de autenticación
+  function setupAuthListener() {
+    onAuthStateChanged(auth, (user) => {
+      console.log('👤 Estado de autenticación cambió:', user ? 'Autenticado' : 'No autenticado', user?.uid);
+      currentUser = user;
+
+      // Si el usuario se autenticó y tenemos un workspaceId, recargar miembros
+      if (user && currentWorkspaceId) {
+        console.log('🔄 Usuario autenticado, recargando miembros para workspace:', currentWorkspaceId);
+        loadWorkspaceMembers(currentWorkspaceId);
+      }
+      // Si el usuario se desautenticó, mostrar mensaje de autenticación requerida
+      else if (!user && currentWorkspaceId) {
+        showErrorMessage('Tu sesión ha expirado. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión nuevamente</a>', false);
+      }
+
+      // Si el usuario se autenticó y estamos en vista de miembros, verificar si necesitamos cargar
+      if (user) {
+        const currentState = dashboardView.get();
+        if (currentState.currentView === 'members' && currentState.selectedWorkspaceId && currentWorkspaceId !== currentState.selectedWorkspaceId) {
+          console.log('🔄 Usuario autenticado y vista de miembros activa, cargando workspace:', currentState.selectedWorkspaceId);
+          loadWorkspaceMembers(currentState.selectedWorkspaceId);
+        }
+      }
+    });
+  }
+
+  // Verificar si ya hay un usuario autenticado al inicializar
+  function checkInitialAuthState() {
+    if (auth.currentUser) {
+      console.log('🔥 Usuario ya autenticado al inicializar:', auth.currentUser.uid);
+      currentUser = auth.currentUser;
+
+      // Verificar inmediatamente el estado del store
+      const currentState = dashboardView.get();
+      console.log('🔍 Estado del store al inicializar:', {
+        currentView: currentState.currentView,
+        selectedWorkspaceId: currentState.selectedWorkspaceId
+      });
+
+      // Si estamos en vista de miembros y hay un workspace seleccionado, cargar inmediatamente
+      if (currentState.currentView === 'members' && currentState.selectedWorkspaceId) {
+        console.log('� Inicializando con vista de miembros activa, cargando workspace:', currentState.selectedWorkspaceId);
+        loadWorkspaceMembers(currentState.selectedWorkspaceId);
+      }
+    } else {
+      console.log('🔥 No hay usuario autenticado al inicializar, esperando...');
+    }
+  }
+
+  // Inicializar cuando el DOM esté listo
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🏁 Inicializando MembersTab...');
+    
+    // Inicializar en orden específico para asegurar timing correcto
+    checkInitialAuthState();
+    setupAuthListener();
+    setupDashboardStoreListener();
+
+    // Verificación final después de un breve delay para asegurar que todo esté inicializado
+    setTimeout(() => {
+      const currentState = dashboardView.get();
+      console.log('🔍 Verificación final del estado después de inicialización:', {
+        currentView: currentState.currentView,
+        selectedWorkspaceId: currentState.selectedWorkspaceId,
+        hasUser: !!currentUser,
+        currentWorkspaceId: currentWorkspaceId
+      });
+
+      // Si todo está listo y estamos en vista de miembros, cargar inmediatamente
+      if (currentState.currentView === 'members' && currentState.selectedWorkspaceId && currentUser) {
+        if (currentWorkspaceId !== currentState.selectedWorkspaceId) {
+          console.log('� Carga final: Detectado workspace en vista de miembros, cargando:', currentState.selectedWorkspaceId);
+          loadWorkspaceMembers(currentState.selectedWorkspaceId);
+        } else {
+          console.log('🔄 Carga final: Workspace ya cargado, omitiendo');
+        }
+      } else {
+        console.log('⏳ Carga final: Condiciones no cumplidas para carga automática');
+      }
+    }, 200);
+  });
 
   // Exponer funciones globalmente para el componente padre
   (window as any).MembersTab = {

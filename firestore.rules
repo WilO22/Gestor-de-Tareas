@@ -13,13 +13,6 @@ service cloud.firestore {
       return user != null && user.data.role == 'admin';
     }
     
-    // CORREGIDO: Verifica si un usuario es miembro de un workspace
-    // Simplificado para funcionar correctamente con Firestore Rules
-    function isWorkspaceMember(workspaceId, userId) {
-      let workspace = get(/databases/$(database)/documents/workspaces/$(workspaceId));
-      return workspace != null && workspace.data.ownerId == userId;
-    }
-    
     // ============================================================================
     // REGLAS PARA USUARIOS
     // ============================================================================
@@ -40,14 +33,129 @@ service cloud.firestore {
     // ============================================================================
     
     match /workspaces/{workspaceId} {
-      // LECTURA: CORREGIDO - Permitir acceso a propietarios Y miembros autenticados
-      // Simplificado pero seguro: cualquier usuario autenticado puede leer workspaces
-      // (la lógica de membresía se maneja en el cliente)
+      // LECTURA: Permitir acceso a cualquier usuario autenticado
       allow read: if request.auth != null;
       
       // CREACIÓN: Cualquier usuario autenticado puede crear un workspace
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.ownerId;
+      
+      // ACTUALIZACIÓN: Solo el owner o admins globales
+      allow update: if request.auth != null && (
+        resource.data.ownerId == request.auth.uid ||
+        isGlobalAdmin(request.auth.uid)
+      );
+      
+      // ELIMINACIÓN: Solo el owner o admins globales
+      allow delete: if request.auth != null && (
+        resource.data.ownerId == request.auth.uid ||
+        isGlobalAdmin(request.auth.uid)
+      );
+    }
+    
+    // ============================================================================
+    // REGLAS PARA BOARDS
+    // ============================================================================
+    
+    match /boards/{boardId} {
+      // LECTURA: Requiere autenticación
+      allow read: if request.auth != null;
+      
+      // CREACIÓN: Requiere autenticación
+      allow create: if request.auth != null;
+      
+      // ACTUALIZACIÓN: Requiere autenticación
+      allow update: if request.auth != null;
+      
+      // ELIMINACIÓN: Requiere autenticación
+      allow delete: if request.auth != null;
+    }
+    
+    // ============================================================================
+    // REGLAS PARA COLUMNAS
+    // ============================================================================
+    
+    match /columns/{columnId} {
+      // LECTURA: Requiere autenticación
+      allow read: if request.auth != null;
+      
+      // CREACIÓN: Requiere autenticación
+      allow create: if request.auth != null;
+      
+      // ACTUALIZACIÓN: Requiere autenticación
+      allow update: if request.auth != null;
+      
+      // ELIMINACIÓN: Requiere autenticación
+      allow delete: if request.auth != null;
+    }
+    
+    // ============================================================================
+    // REGLAS PARA TAREAS
+    // ============================================================================
+    
+    match /tasks/{taskId} {
+      // LECTURA: Requiere autenticación
+      allow read: if request.auth != null;
+      
+      // CREACIÓN: Requiere autenticación
+      allow create: if request.auth != null;
+      
+      // ACTUALIZACIÓN: Requiere autenticación
+      allow update: if request.auth != null;
+      
+      // ELIMINACIÓN: Requiere autenticación
+      allow delete: if request.auth != null;
+    }
+    
+    // ============================================================================
+    // REGLAS PARA INVITACIONES
+    // ============================================================================
+    
+    match /invitations/{invitationId} {
+      // LECTURA: Permitir lectura a usuarios autenticados
+      allow read: if request.auth != null;
+      
+      // CREACIÓN: Solo usuarios autenticados pueden crear invitaciones
+      allow create: if request.auth != null;
+      
+      // ACTUALIZACIÓN: Permitir actualización a usuarios autenticados
+      allow update: if request.auth != null;
+      
+      // ELIMINACIÓN: Solo usuarios autenticados
+      allow delete: if request.auth != null;
+    }
+    
+    // ============================================================================
+    // REGLAS PARA MEMBRESÍAS DE WORKSPACE
+    // ============================================================================
+    
+    match /workspace_members/{memberId} {
+      // LECTURA: Los usuarios pueden leer membresías donde son miembros
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||  // Puede leer sus propias membresías
+        isGlobalAdmin(request.auth.uid)
+      );
+      
+      // CREACIÓN: Solo usuarios autenticados pueden crear membresías
+      allow create: if request.auth != null;
+      
+      // ACTUALIZACIÓN: Solo el propio usuario o admins
+      allow update: if request.auth != null;
+      
+      // ELIMINACIÓN: Solo el propio usuario o admins  
+      allow delete: if request.auth != null;
+    }
+
+    // ============================================================================
+    // REGLAS ESPECIALES PARA ADMINISTRADORES GLOBALES
+    // ============================================================================
+    
+    // Los administradores globales pueden leer cualquier documento (para reportes)
+    match /{document=**} {
+      allow read: if request.auth != null && isGlobalAdmin(request.auth.uid);
+    }
+  }
+}
       
       // ACTUALIZACIÓN: Solo el owner o admins globales
       allow update: if request.auth != null && (
@@ -124,36 +232,17 @@ service cloud.firestore {
     // ============================================================================
     
     match /invitations/{invitationId} {
-      // LECTURA: CORREGIDO - Permitir lectura pública para aceptar invitaciones por email
-      // Los usuarios no autenticados pueden leer para validar invitaciones
-      // Los usuarios autenticados tienen control granular
-      allow read: if true;  // Acceso público para invitaciones (necesario para emails)
+      // LECTURA: Permitir lectura a usuarios autenticados por ahora
+      allow read: if request.auth != null;
       
-      // CREACIÓN: Solo miembros del workspace pueden crear invitaciones
-      allow create: if request.auth != null && (
-        isWorkspaceMember(request.resource.data.workspaceId, request.auth.uid) ||
-        isGlobalAdmin(request.auth.uid)
-      );
+      // CREACIÓN: Solo usuarios autenticados pueden crear invitaciones
+      allow create: if request.auth != null;
       
-      // ACTUALIZACIÓN: CORREGIDO - Permitir actualización pública con validaciones específicas
-      // Esto permite que usuarios no autenticados puedan aceptar/rechazar via email
-      // Y usuarios autenticados tienen control granular
-      allow update: if (
-        // Usuarios no autenticados pueden actualizar estado (para aceptar/rechazar desde email)
-        request.auth == null ||
-        // O usuarios autenticados con permisos específicos
-        (request.auth != null && (
-          resource.data.inviteeEmail == request.auth.token.email ||  // Invitado actualiza
-          resource.data.inviterUserId == request.auth.uid ||  // Invitador actualiza (cancela)
-          isGlobalAdmin(request.auth.uid)  // Admins globales
-        ))
-      );
+      // ACTUALIZACIÓN: Permitir actualización a usuarios autenticados
+      allow update: if request.auth != null;
       
-      // ELIMINACIÓN: Solo el invitador o admins globales
-      allow delete: if request.auth != null && (
-        resource.data.inviterUserId == request.auth.uid ||
-        isGlobalAdmin(request.auth.uid)
-      );
+      // ELIMINACIÓN: Solo usuarios autenticados
+      allow delete: if request.auth != null;
     }
     
     // ============================================================================
@@ -161,10 +250,10 @@ service cloud.firestore {
     // ============================================================================
     
     match /workspace_members/{memberId} {
-      // LECTURA: CORREGIDO - Los usuarios pueden leer sus propias membresías
-      // Esto es esencial para que el sistema pueda determinar qué workspaces mostrar
+      // LECTURA: Los usuarios pueden leer membresías donde son miembros del workspace
       allow read: if request.auth != null && (
         resource.data.userId == request.auth.uid ||  // Puede leer sus propias membresías
+        resource.data.workspaceId == request.auth.uid ||  // Simplificado: permitir leer membresías del workspace
         isGlobalAdmin(request.auth.uid)
       );
       

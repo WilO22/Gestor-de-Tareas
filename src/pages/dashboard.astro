@@ -1,28 +1,137 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import DashboardHeader from "../components/dashboard/DashBoardHeader.astro";
-import SidebarIsland from "../components/dashboard/SidebarIsland.astro";
-import WorkspacesViewIsland from "../components/dashboard/WorkspacesViewIsland.astro";
-import MembersManagementIsland from "../components/dashboard/MembersManagementIsland.astro";
-import CreateWorkspaceModal from "../components/dashboard/CreateWorkspaceModal.astro";
+// src/pages/dashboard.astro
+import UnifiedLayout from '../layouts/UnifiedLayout.astro';
+import WorkspacesViewIsland from '../components/dashboard/WorkspacesViewIsland.astro';
+import BoardsView from '../components/dashboard/BoardsView.astro';
+import MembersTab from '../components/dashboard/MembersTab.astro';
+import SettingsView from '../components/dashboard/SettingsView.astro';
+import CreateWorkspaceModal from '../components/dashboard/CreateWorkspaceModal.astro';
 ---
 
+<UnifiedLayout title="Dashboard - TaskFlow">
+	<div class="p-8">
+		<div class="w-full px-6 md:px-12 xl:px-24 2xl:px-40">
 
-<Layout title="Dashboard - Server Islands">
-  <div id="app-container" class="h-screen overflow-hidden">
-    <DashboardHeader />
-    <div class="flex h-screen">
-      <SidebarIsland server:defer />
-      <main class="flex-1 overflow-auto bg-gray-50">
-        <div class="p-8">
-          <div id="workspaces-view" class="workspace-view-container">
-            <WorkspacesViewIsland server:defer />
-          </div>
-          <!-- Aquí puedes agregar otros islands o componentes si es necesario -->
-        </div>
-      </main>
-    </div>
-    <!-- Modal para crear workspace - debe estar disponible globalmente -->
-    <CreateWorkspaceModal />
-  </div>
-</Layout>
+			<!-- Contenedor de vistas -->
+			<div id="workspaces-view" class="workspace-view-container">
+				<WorkspacesViewIsland />
+			</div>
+			<div id="boards-view" class="workspace-view-container hidden" data-workspace-id="">
+				<BoardsView />
+			</div>
+			<div id="members-view" class="workspace-view-container hidden">
+				<MembersTab />
+			</div>
+			<div id="settings-view" class="workspace-view-container hidden" data-workspace-id="">
+				<SettingsView />
+			</div>
+		</div>
+	</div>
+
+	<!-- Modal para crear workspace -->
+	<CreateWorkspaceModal />
+
+	<script>
+		import { dashboardView, showWorkspaces, showWorkspaceBoards, showWorkspaceMembers, showWorkspaceSettings } from '../store/store';
+
+		// Función para manejar la visibilidad de las vistas del dashboard
+		function handleDashboardViewVisibility(state: { currentView: string; selectedWorkspaceId: string | null }) {
+			console.log('📊 Dashboard: Cambiando vista a:', state.currentView, 'workspace:', state.selectedWorkspaceId);
+
+			// Ocultar todas las vistas primero
+			const views = ['workspaces-view', 'boards-view', 'members-view', 'settings-view'];
+			views.forEach(viewId => {
+				const view = document.getElementById(viewId);
+				if (view) {
+					view.classList.add('hidden');
+					console.log('📊 Dashboard: Ocultando vista:', viewId);
+				}
+			});
+
+			// Mostrar la vista activa
+			const activeViewId = `${state.currentView}-view`;
+			const activeView = document.getElementById(activeViewId);
+			if (activeView) {
+				activeView.classList.remove('hidden');
+
+				// Actualizar el workspaceId en el contenedor si es necesario
+				if (state.selectedWorkspaceId) {
+					activeView.setAttribute('data-workspace-id', state.selectedWorkspaceId);
+					console.log('📊 Dashboard: Workspace ID actualizado en contenedor:', activeViewId, state.selectedWorkspaceId);
+				}
+
+				console.log('📊 Dashboard: Vista activada:', activeViewId);
+			} else {
+				console.error('📊 Dashboard: No se encontró vista con ID:', activeViewId);
+			}
+
+			// Actualizar la URL sin recargar la página
+			updateDashboardURL(state);
+		}
+
+		// Función para actualizar la URL del dashboard
+		function updateDashboardURL(state: { currentView: string; selectedWorkspaceId: string | null }) {
+			const url = new URL(window.location.href);
+
+			if (state.selectedWorkspaceId && state.currentView !== 'workspaces') {
+				url.searchParams.set('workspace', state.selectedWorkspaceId);
+				url.searchParams.set('view', state.currentView);
+			} else {
+				url.searchParams.delete('workspace');
+				url.searchParams.delete('view');
+			}
+
+			// Actualizar la URL sin recargar
+			window.history.replaceState(null, '', url.toString());
+			console.log('📊 Dashboard: URL actualizada a:', url.toString());
+		}
+
+		// Función para leer parámetros de la URL y configurar estado inicial
+		function initializeFromURL() {
+			const url = new URL(window.location.href);
+			const workspaceId = url.searchParams.get('workspace');
+			const view = url.searchParams.get('view');
+
+			if (workspaceId && view) {
+				console.log('📊 Dashboard: Inicializando desde URL - workspace:', workspaceId, 'view:', view);
+
+				// Configurar el estado inicial basado en la URL
+				if (view === 'boards') {
+					showWorkspaceBoards(workspaceId);
+				} else if (view === 'members') {
+					showWorkspaceMembers(workspaceId);
+				} else if (view === 'settings') {
+					showWorkspaceSettings(workspaceId);
+				}
+			} else {
+				console.log('📊 Dashboard: No hay parámetros en URL, mostrando vista de workspaces');
+				showWorkspaces();
+			}
+		}
+
+		// Inicializar cuando el DOM esté listo
+		function initializeDashboard() {
+			console.log('📊 Dashboard: Inicializando controlador de vistas');
+
+			// Leer estado inicial desde URL
+			initializeFromURL();
+
+			// Suscribirse a cambios del store
+			dashboardView.subscribe((state) => {
+				console.log('📊 Dashboard: Store cambió, manejando visibilidad');
+				handleDashboardViewVisibility(state);
+			});
+
+			// Verificar estado inicial después de configurar desde URL
+			const initialState = dashboardView.get();
+			console.log('📊 Dashboard: Estado inicial del store:', initialState);
+			handleDashboardViewVisibility(initialState);
+		}
+
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', initializeDashboard);
+		} else {
+			initializeDashboard();
+		}
+	</script>
+</UnifiedLayout>

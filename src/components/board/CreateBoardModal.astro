@@ -160,6 +160,21 @@ const { id = 'create-board-modal', show = false, workspaceId = '' } = Astro.prop
 
             console.log('🔥 CreateBoardModal: Creando board:', name, 'en workspace:', workspaceId);
 
+            // Verificar autenticación antes de crear el board
+            const { auth } = await import('../../firebase/auth');
+            if (!auth.currentUser) {
+              console.error('🔥 CreateBoardModal: Usuario no autenticado');
+              (window as any).showToast({
+                message: 'Debes iniciar sesión para crear un tablero',
+                type: 'error'
+              });
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Crear tablero';
+              return;
+            }
+
+            console.log('🔥 CreateBoardModal: Usuario autenticado:', auth.currentUser.uid);
+
             // Crear board usando la API
             const result = await createBoard(name, workspaceId);
 
@@ -183,8 +198,25 @@ const { id = 'create-board-modal', show = false, workspaceId = '' } = Astro.prop
               }));
             } else {
               console.error('🔥 CreateBoardModal: Error creando board:', result.error);
+
+              // Manejar errores específicos
+              let errorMessage = 'Error al crear tablero';
+              if (result.error instanceof Error) {
+                if (result.error.message.includes('permission-denied')) {
+                  errorMessage = 'No tienes permisos para crear tableros en este workspace';
+                } else if (result.error.message.includes('unauthenticated')) {
+                  errorMessage = 'Debes iniciar sesión para crear un tablero';
+                } else if (result.error.message.includes('Usuario no autenticado')) {
+                  errorMessage = 'Debes iniciar sesión para crear un tablero';
+                } else {
+                  errorMessage = result.error.message;
+                }
+              } else if (typeof result.error === 'string') {
+                errorMessage = result.error;
+              }
+
               (window as any).showToast({
-                message: 'Error al crear tablero: ' + (result.error || 'Error desconocido'),
+                message: errorMessage,
                 type: 'error'
               });
               submitBtn.disabled = false;

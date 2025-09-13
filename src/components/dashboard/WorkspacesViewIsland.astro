@@ -91,6 +91,7 @@ const serverWorkspaces: any[] = [];
   import type { Unsubscribe } from 'firebase/firestore';
   import { formatRelativeTime } from '../../utils/date.utils';
   import { app } from '../../firebase/client';
+  import { dashboardView } from '../../store/store';
 
   console.log('🏝️ WorkspacesViewIsland: Hidratando en cliente');
 
@@ -147,6 +148,22 @@ const serverWorkspaces: any[] = [];
   // Función para actualizar visibilidad
   function updateVisibility() {
     const elements = getElements();
+    const workspacesView = document.getElementById('workspaces-view');
+
+    // Primero manejar visibilidad del contenedor principal basado en el store
+    const dashboardState = dashboardView.get();
+    if (dashboardState.currentView === 'workspaces') {
+      if (workspacesView) {
+        workspacesView.classList.remove('hidden');
+      }
+    } else {
+      if (workspacesView) {
+        workspacesView.classList.add('hidden');
+      }
+      return; // No continuar si no está visible
+    }
+
+    // Luego manejar visibilidad interna (loading, empty, grid)
     if (state.loading) {
       elements.loadingState?.removeAttribute('style');
       elements.grid?.setAttribute('style', 'display:none');
@@ -385,6 +402,17 @@ const serverWorkspaces: any[] = [];
       renderWorkspaces([]);
     }
   }
+
+  // Suscribirse a cambios del dashboard store para manejar visibilidad
+  dashboardView.subscribe((dashboardState) => {
+    console.log('🏝️ WorkspacesViewIsland: Dashboard store cambió:', dashboardState);
+    updateVisibility();
+  });
+
+  // Verificar estado inicial del dashboard
+  const initialDashboardState = dashboardView.get();
+  console.log('🏝️ WorkspacesViewIsland: Estado inicial del dashboard:', initialDashboardState);
+  updateVisibility();
 
   // Auto-inicialización
   if (document.readyState === 'loading') {

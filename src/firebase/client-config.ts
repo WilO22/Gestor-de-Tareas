@@ -32,6 +32,8 @@ export { app };
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+console.log('🔥 Firebase inicializado correctamente en client-config.ts');
+
 // Re-exportar funciones para uso externo
 export { initializeApp };
 export { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged };

@@ -1,0 +1,45 @@
+---
+// src/layouts/UnifiedLayout.astro
+import '../styles/global.css'
+import Toast from '../components/ui/Toast.astro'
+import Sidebar from '../components/dashboard/Sidebar.astro'
+import DashboardHeader from '../components/dashboard/DashBoardHeader.astro'
+
+// Aceptamos 'title' como prop desde las páginas
+const { title = 'TaskFlow' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+	</head>
+	<body>
+		<div id="app-container" class="h-screen overflow-hidden flex">
+			<Sidebar />
+			<div class="flex-1 flex flex-col overflow-hidden">
+				<DashboardHeader />
+				<main class="flex-1 overflow-auto bg-gray-50">
+					<slot />
+				</main>
+			</div>
+		</div>
+
+		<!-- Sistema de notificaciones Toast disponible globalmente -->
+		<Toast />
+
+		<script type="module" is:inline>
+			// Importar Firebase primero para inicialización
+			import '/src/firebase/client-config.ts';
+			// Importar navegación SPA
+			import '/src/scripts/shared/spa-navigation.ts';
+			// Importar sistema de toast
+			import '/src/scripts/shared/toast.ts';
+			// El sidebar se inicializa automáticamente desde SidebarIsland.astro
+		</script>
+	</body>
+</html>
