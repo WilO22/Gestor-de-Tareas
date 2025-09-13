@@ -205,14 +205,22 @@ if (!invitationId) {
           inviteeEmail: invitationData.inviteeEmail,
           message: invitationData.message,
           status: invitationData.status,
+          type: invitationData.type || 'email', // Default to 'email' for backward compatibility
           createdAt: invitationData.createdAt?.toDate() || new Date(),
           sentAt: invitationData.sentAt?.toDate(),
           acceptedAt: invitationData.acceptedAt?.toDate(),
           rejectedAt: invitationData.rejectedAt?.toDate(),
           acceptedByUserId: invitationData.acceptedByUserId,
           expiresAt: invitationData.expiresAt?.toDate() || new Date(),
-          error: invitationData.error
+          error: invitationData.error,
+          workspaceName: invitationData.workspaceName,
+          inviterName: invitationData.inviterName
         };
+
+        // Verificar que la invitación se creó correctamente
+        if (!currentInvitation) {
+          throw new Error('Error procesando datos de la invitación');
+        }
         
         // // MEJORADO: Verificar estado de la invitación con información específica
         if (currentInvitation.status === 'accepted') {

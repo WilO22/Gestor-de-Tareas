@@ -83,6 +83,7 @@ export interface Invitation {
   inviteeEmail: string;     // Email del usuario invitado
   message?: string;         // Mensaje personalizado (opcional)
   status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'failed'; // Estado de la invitación
+  type: 'email' | 'link';   // Tipo de invitación: email para invitaciones por correo, link para enlaces compartibles
   createdAt: Date;          // Fecha de creación de la invitación
   sentAt?: Date;            // Fecha de envío del email (opcional)
   acceptedAt?: Date;        // Fecha de aceptación (opcional)

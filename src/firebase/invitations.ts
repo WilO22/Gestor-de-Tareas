@@ -58,12 +58,14 @@ async function sendRealEmail(invitation: Invitation, workspaceName: string, invi
  * @param workspaceId - ID del workspace
  * @param inviteeEmail - Email del usuario a invitar
  * @param message - Mensaje personalizado (opcional)
+ * @param type - Tipo de invitación: 'email' para invitaciones por correo, 'link' para enlaces compartibles
  * @returns Promise con el resultado de la operación
  */
 export async function createInvitation(
   workspaceId: string, 
   inviteeEmail: string, 
-  message?: string
+  message?: string,
+  type: 'email' | 'link' = 'email'
 ): Promise<{ success: boolean; invitationId?: string; error?: string }> {
   try {
     console.log('📧 Creando invitación para:', inviteeEmail);
@@ -75,20 +77,23 @@ export async function createInvitation(
     }
 
     // Verificar si ya existe una invitación pendiente para este email y workspace
-    const existingInvitations = await getDocs(
-      query(
-        collection(db, 'invitations'),
-        where('workspaceId', '==', workspaceId),
-        where('inviteeEmail', '==', inviteeEmail.toLowerCase()),
-        where('status', 'in', ['pending', 'sent'])
-      )
-    );
+    // Solo verificar duplicados para invitaciones por email, no para enlaces compartibles
+    if (type === 'email') {
+      const existingInvitations = await getDocs(
+        query(
+          collection(db, 'invitations'),
+          where('workspaceId', '==', workspaceId),
+          where('inviteeEmail', '==', inviteeEmail.toLowerCase()),
+          where('status', 'in', ['pending', 'sent'])
+        )
+      );
 
-    if (!existingInvitations.empty) {
-      return {
-        success: false,
-        error: 'Ya existe una invitación pendiente para este email'
-      };
+      if (!existingInvitations.empty) {
+        return {
+          success: false,
+          error: 'Ya existe una invitación pendiente para este email'
+        };
+      }
     }
 
     // // CORREGIDO: Crear la invitación con campos de respaldo para evitar problemas de permisos
@@ -98,6 +103,7 @@ export async function createInvitation(
       inviteeEmail: inviteeEmail.toLowerCase(),
       message: message || '',
       status: 'pending',
+      type: type,
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días de expiración
       // // NUEVO: Campos de respaldo para evitar consultas adicionales con problemas de permisos
@@ -175,32 +181,47 @@ export async function createInvitation(
       ...updatedInvitationData
     };
     
-    // // NUEVO: Enviar email real usando API Route
-    const emailResult = await sendRealEmail(invitationWithId, workspaceName, inviterName);
-    
-    if (emailResult.success) {
-      // // Actualizar estado a 'sent' si el email se envió correctamente
+    // // NUEVO: Enviar email real usando API Route solo para invitaciones por email
+    if (type === 'email') {
+      const emailResult = await sendRealEmail(invitationWithId, workspaceName, inviterName);
+      
+      if (emailResult.success) {
+        // // Actualizar estado a 'sent' si el email se envió correctamente
+        await updateDoc(doc(db, 'invitations', docRef.id), {
+          status: 'sent',
+          sentAt: new Date()
+        });
+        
+        console.log('✅ Invitación creada y email enviado. ID:', docRef.id);
+        
+        return {
+          success: true,
+          invitationId: docRef.id
+        };
+      } else {
+        // // Marcar como fallida si el email no se pudo enviar
+        await updateDoc(doc(db, 'invitations', docRef.id), {
+          status: 'failed',
+          error: emailResult.error
+        });
+        
+        return {
+          success: false,
+          error: `Invitación creada pero email falló: ${emailResult.error}`
+        };
+      }
+    } else {
+      // Para enlaces compartibles, marcar como 'sent' inmediatamente
       await updateDoc(doc(db, 'invitations', docRef.id), {
         status: 'sent',
         sentAt: new Date()
       });
       
-      console.log('✅ Invitación creada y email enviado. ID:', docRef.id);
+      console.log('✅ Enlace compartible creado. ID:', docRef.id);
       
       return {
         success: true,
         invitationId: docRef.id
-      };
-    } else {
-      // // Marcar como fallida si el email no se pudo enviar
-      await updateDoc(doc(db, 'invitations', docRef.id), {
-        status: 'failed',
-        error: emailResult.error
-      });
-      
-      return {
-        success: false,
-        error: `Invitación creada pero email falló: ${emailResult.error}`
       };
     }
 
@@ -239,13 +260,16 @@ export async function getWorkspaceInvitations(workspaceId: string): Promise<Invi
         inviteeEmail: data.inviteeEmail,
         message: data.message,
         status: data.status,
+        type: data.type || 'email', // Default to 'email' for backward compatibility
         createdAt: data.createdAt?.toDate() || new Date(),
         sentAt: data.sentAt?.toDate(),
         acceptedAt: data.acceptedAt?.toDate(),
         rejectedAt: data.rejectedAt?.toDate(),
         acceptedByUserId: data.acceptedByUserId,
         expiresAt: data.expiresAt?.toDate() || new Date(),
-        error: data.error
+        error: data.error,
+        workspaceName: data.workspaceName,
+        inviterName: data.inviterName
       } as Invitation);
     });
 
@@ -284,13 +308,16 @@ export async function getUserInvitations(userEmail: string): Promise<Invitation[
         inviteeEmail: data.inviteeEmail,
         message: data.message,
         status: data.status,
+        type: data.type || 'email', // Default to 'email' for backward compatibility
         createdAt: data.createdAt?.toDate() || new Date(),
         sentAt: data.sentAt?.toDate(),
         acceptedAt: data.acceptedAt?.toDate(),
         rejectedAt: data.rejectedAt?.toDate(),
         acceptedByUserId: data.acceptedByUserId,
         expiresAt: data.expiresAt?.toDate() || new Date(),
-        error: data.error
+        error: data.error,
+        workspaceName: data.workspaceName,
+        inviterName: data.inviterName
       } as Invitation);
     });
 
@@ -399,13 +426,54 @@ export async function cancelInvitation(invitationId: string): Promise<{ success:
 }
 
 /**
- * Función helper para verificar si un email ya tiene una invitación pendiente
+ * Crea un enlace compartible para invitar miembros sin restricciones de email duplicado
  * @param workspaceId - ID del workspace
- * @param email - Email a verificar
- * @returns Promise<boolean> indicando si tiene invitación pendiente
+ * @param message - Mensaje personalizado (opcional)
+ * @returns Promise con el resultado de la operación
  */
-export async function hasInvitationPending(workspaceId: string, email: string): Promise<boolean> {
+export async function createShareableLink(
+  workspaceId: string,
+  message?: string
+): Promise<{ success: boolean; invitationId?: string; invitationLink?: string; error?: string }> {
   try {
+    console.log('🔗 Creando enlace compartible para workspace:', workspaceId);
+
+    // Generar un email único para el enlace compartible usando timestamp
+    const uniqueEmail = `link-${Date.now()}@shared.invitation`;
+
+    // Crear la invitación usando el tipo 'link'
+    const result = await createInvitation(workspaceId, uniqueEmail, message || 'Enlace compartible generado automáticamente', 'link');
+
+    if (result.success && result.invitationId) {
+      const invitationLink = `${window.location.origin}/accept-invitation/${result.invitationId}`;
+      console.log('✅ Enlace compartible creado:', invitationLink);
+
+      return {
+        success: true,
+        invitationId: result.invitationId,
+        invitationLink: invitationLink
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Error creando enlace compartible'
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error creando enlace compartible:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+export async function hasInvitationPending(workspaceId: string, email: string, type: 'email' | 'link' = 'email'): Promise<boolean> {
+  try {
+    // Para enlaces compartibles, siempre devolver false (permitir múltiples)
+    if (type === 'link') {
+      return false;
+    }
+
     const q = query(
       collection(db, 'invitations'),
       where('workspaceId', '==', workspaceId),

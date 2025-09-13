@@ -6,6 +6,7 @@ import BoardsView from '../components/dashboard/BoardsView.astro';
 import MembersTab from '../components/dashboard/MembersTab.astro';
 import SettingsView from '../components/dashboard/SettingsView.astro';
 import CreateWorkspaceModal from '../components/dashboard/CreateWorkspaceModal.astro';
+import InviteMemberModal from '../components/dashboard/InviteMemberModal.astro';
 ---
 
 <UnifiedLayout title="Dashboard - TaskFlow">
@@ -30,6 +31,9 @@ import CreateWorkspaceModal from '../components/dashboard/CreateWorkspaceModal.a
 
 	<!-- Modal para crear workspace -->
 	<CreateWorkspaceModal />
+
+	<!-- Modal para invitar miembros -->
+	<InviteMemberModal />
 
 	<script>
 		import { dashboardView, showWorkspaces, showWorkspaceBoards, showWorkspaceMembers, showWorkspaceSettings } from '../store/store';

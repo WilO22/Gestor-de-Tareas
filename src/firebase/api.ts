@@ -66,78 +66,20 @@ export async function getWorkspaceById(workspaceId: string) {
   }
 }
 
-// Función para obtener miembros de un workspace (pequeño helper usado por componentes)
+// Función para obtener miembros de un workspace (lee desde el documento del workspace)
 export async function getWorkspaceMembers(workspaceId: string): Promise<Member[]> {
   try {
     console.log('🔍 Obteniendo miembros del workspace:', workspaceId);
 
-    // Primero intentar obtener desde el documento del workspace (para owners)
-    try {
-      const workspace = await getWorkspaceById(workspaceId);
-      if (workspace?.members && workspace.members.length > 0) {
-        console.log('✅ Miembros obtenidos desde documento del workspace:', workspace.members.length);
-        return workspace.members;
-      }
-    } catch (workspaceError) {
-      console.warn('⚠️ No se pudo leer documento del workspace, intentando colección de membresías:', workspaceError);
+    // Obtener el workspace y sus miembros
+    const workspace = await getWorkspaceById(workspaceId);
+    if (workspace?.members) {
+      console.log('✅ Miembros obtenidos desde documento del workspace:', workspace.members.length);
+      return workspace.members;
     }
 
-    // Si no se pudo leer el workspace, intentar desde workspace_members
-    try {
-      const membersQuery = query(collection(db, 'workspace_members'), where('workspaceId', '==', workspaceId));
-      const membersSnapshot = await getDocs(membersQuery);
-
-      console.log('📊 Membresías encontradas:', membersSnapshot.docs.length);
-
-      const members: Member[] = [];
-
-      // Para cada membresía, obtener información del usuario
-      for (const memberDoc of membersSnapshot.docs) {
-        const memberData = memberDoc.data();
-        const userId = memberData.userId;
-
-        try {
-          // Obtener información del usuario desde la colección users
-          const userDoc = await getDoc(doc(db, 'users', userId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            members.push({
-              userId: userId,
-              email: userData.email || memberData.email || '',
-              displayName: userData.displayName || userData.email?.split('@')[0] || 'Usuario',
-              role: memberData.role || 'member',
-              joinedAt: memberData.joinedAt?.toDate() || new Date()
-            });
-          } else {
-            // Si no hay documento de usuario, usar datos de la membresía
-            members.push({
-              userId: userId,
-              email: memberData.email || '',
-              displayName: memberData.displayName || 'Usuario',
-              role: memberData.role || 'member',
-              joinedAt: memberData.joinedAt?.toDate() || new Date()
-            });
-          }
-        } catch (userError) {
-          console.warn('⚠️ Error obteniendo datos de usuario para', userId, ':', userError);
-          // Usar datos básicos de la membresía como fallback
-          members.push({
-            userId: userId,
-            email: memberData.email || '',
-            displayName: memberData.displayName || 'Usuario',
-            role: memberData.role || 'member',
-            joinedAt: memberData.joinedAt?.toDate() || new Date()
-          });
-        }
-      }
-
-      console.log('✅ Miembros obtenidos desde colección workspace_members:', members.length);
-      return members;
-
-    } catch (membersError) {
-      console.warn('⚠️ No se pudieron obtener membresías desde colección:', membersError);
-      return [];
-    }
+    console.log('⚠️ Workspace no encontrado o sin miembros');
+    return [];
 
   } catch (error) {
     console.error('❌ Error obteniendo miembros del workspace:', error);
@@ -1328,131 +1270,34 @@ export function subscribeToTask(taskId: string, callback: (task: Task) => void):
   });
 }
 
-// Suscripción en tiempo real a cambios en miembros de un workspace específico
-export function subscribeToWorkspaceMembers(
-  workspaceId: string,
-  callback: (members: User[]) => void
-): () => void {
-  console.log('🔍 Suscribiendo a miembros del workspace:', workspaceId);
+// Función para suscribirse a cambios en miembros de un workspace en tiempo real
+export function subscribeToWorkspaceMembers(workspaceId: string, callback: (members: Member[]) => void): Unsubscribe {
+  console.log('📡 Configurando suscripción a miembros del workspace:', workspaceId);
 
-  // Función auxiliar para obtener miembros desde workspace_members
-  const getMembersFromWorkspaceMembers = async (): Promise<User[]> => {
-    try {
-      const membersQuery = query(collection(db, 'workspace_members'), where('workspaceId', '==', workspaceId));
-      const membersSnapshot = await getDocs(membersQuery);
-
-      console.log('📊 Membresías encontradas:', membersSnapshot.docs.length);
-
-      const members: User[] = [];
-
-      // Para cada membresía, obtener información del usuario
-      for (const memberDoc of membersSnapshot.docs) {
-        const memberData = memberDoc.data();
-        const userId = memberData.userId;
-
-        try {
-          // Obtener información del usuario desde la colección users
-          const userDoc = await getDoc(doc(db, 'users', userId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            members.push({
-              id: userDoc.id,
-              email: userData?.email || memberData.email || '',
-              displayName: userData?.displayName || userData?.email?.split('@')[0] || 'Usuario',
-              photoURL: userData?.photoURL || '',
-              role: memberData.role || 'member',
-              workspaces: userData?.workspaces || [],
-              createdAt: userData?.createdAt ? (userData.createdAt as any).toDate?.() || userData.createdAt : new Date(),
-              lastLogin: userData?.lastLogin ? (userData.lastLogin as any).toDate?.() || userData.lastLogin : undefined
-            } as User);
-          } else {
-            // Si no hay documento de usuario, usar datos de la membresía
-            members.push({
-              id: userId,
-              email: memberData.email || '',
-              displayName: memberData.displayName || 'Usuario',
-              photoURL: '',
-              role: memberData.role || 'member',
-              workspaces: [],
-              createdAt: new Date(),
-              lastLogin: undefined
-            } as User);
-          }
-        } catch (userError) {
-          console.warn('⚠️ Error obteniendo datos de usuario para', userId, ':', userError);
-          // Usar datos básicos de la membresía como fallback
-          members.push({
-            id: userId,
-            email: memberData.email || '',
-            displayName: memberData.displayName || 'Usuario',
-            photoURL: '',
-            role: memberData.role || 'member',
-            workspaces: [],
-            createdAt: new Date(),
-            lastLogin: undefined
-          } as User);
-        }
-      }
-
-      console.log('✅ Miembros obtenidos desde colección workspace_members:', members.length);
-      return members;
-
-    } catch (membersError) {
-      console.warn('⚠️ No se pudieron obtener membresías desde colección:', membersError);
-      return [];
-    }
-  };
-
-  // Intentar primero suscribirse al documento del workspace
+  // Suscribirse a cambios en el documento del workspace
   const workspaceRef = doc(db, 'workspaces', workspaceId);
 
   return onSnapshot(workspaceRef, async (workspaceDoc) => {
     try {
       if (!workspaceDoc.exists()) {
-        console.log('📄 Workspace no existe, intentando colección workspace_members');
-        // Si el workspace no existe, intentar obtener desde workspace_members
-        const members = await getMembersFromWorkspaceMembers();
-        callback(members);
+        console.log('📄 Workspace no existe');
+        callback([]);
         return;
       }
 
       const workspaceData = workspaceDoc.data();
-      const membersArray = workspaceData?.members || [];
-
-      if (membersArray.length === 0) {
-        console.log('📄 Workspace existe pero no tiene miembros en el documento, intentando colección workspace_members');
-        // Si no hay miembros en el documento, intentar colección workspace_members
-        const members = await getMembersFromWorkspaceMembers();
-        callback(members);
-        return;
-      }
-
-      // Los miembros ya están completos en el documento del workspace
-      const members: User[] = membersArray.map((member: any) => ({
-        id: member.userId,
-        email: member.email || '',
-        displayName: member.displayName || 'Usuario',
-        photoURL: '',
-        role: member.role || 'member',
-        workspaces: [],
-        createdAt: member.joinedAt ? new Date(member.joinedAt.seconds * 1000) : new Date(),
-        lastLogin: undefined
-      }));
+      const members = workspaceData?.members || [];
 
       console.log('✅ Miembros obtenidos desde documento del workspace:', members.length);
       callback(members);
 
     } catch (error) {
-      console.error('❌ Error en subscribeToWorkspaceMembers:', error);
-      // En caso de error, intentar colección workspace_members como fallback
-      try {
-        const members = await getMembersFromWorkspaceMembers();
-        callback(members);
-      } catch (fallbackError) {
-        console.error('❌ Error en fallback también:', fallbackError);
-        callback([]);
-      }
+      console.error('❌ Error procesando snapshot de miembros:', error);
+      callback([]);
     }
+  }, (error) => {
+    console.error('❌ Error en suscripción a miembros:', error);
+    callback([]);
   });
 }
 

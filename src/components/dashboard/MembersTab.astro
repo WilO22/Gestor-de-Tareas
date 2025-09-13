@@ -36,12 +36,14 @@
 <script>
   // Script específico para la gestión de miembros
   import { subscribeToWorkspaceMembers } from '../../firebase/api';
-  import { onAuthStateChanged, auth } from '../../firebase/auth';
+  import { authStore } from '../../stores/auth.store';
   import { dashboardView } from '../../store/store';
+  import { createShareableLink } from '../../firebase/invitations';
 
   let membersUnsubscribe: any = null;
   let currentWorkspaceId: string = '';
   let currentUser: any = null;
+  let authTimeoutId: any = null;
 
   // Función para mostrar mensajes de error usando el sistema de toast
   function showErrorMessage(message: string, isError: boolean = true) {
@@ -80,29 +82,207 @@
 
     if (state.currentView === 'members' && state.selectedWorkspaceId) {
       console.log('👥 MembersTab: Vista de miembros activa para workspace:', state.selectedWorkspaceId);
-      // El contenedor padre ya debería estar visible, solo necesitamos cargar los miembros
-      if (state.selectedWorkspaceId !== currentWorkspaceId) {
-        console.log('👥 MembersTab: Cargando miembros para nuevo workspace:', state.selectedWorkspaceId);
-        loadWorkspaceMembers(state.selectedWorkspaceId);
-      }
+
+      // Esperar a que el authStore esté listo antes de cargar miembros
+      waitForAuthAndLoadMembers(state.selectedWorkspaceId);
     } else {
       console.log('👥 MembersTab: Vista de miembros inactiva');
       // No necesitamos ocultar nada aquí, el contenedor padre se encarga de eso
     }
   }
 
+  // Función para esperar a que auth esté listo y luego cargar miembros
+  async function waitForAuthAndLoadMembers(workspaceId: string) {
+    console.log('👥 MembersTab: Esperando autenticación para workspace:', workspaceId);
+
+    // Verificar estado actual de auth
+    const currentAuthState = authStore.getState();
+
+    // Si ya tenemos un usuario autenticado, cargar inmediatamente
+    if (currentAuthState.isAuthenticated && currentAuthState.user) {
+      console.log('👥 MembersTab: Usuario ya autenticado, cargando miembros inmediatamente');
+      loadWorkspaceMembers(workspaceId);
+      return;
+    }
+
+    // Si está cargando, esperar a que termine
+    if (currentAuthState.isLoading) {
+      console.log('👥 MembersTab: Auth está cargando, esperando...');
+
+      // Limpiar timeout anterior si existe
+      if (authTimeoutId) {
+        clearTimeout(authTimeoutId);
+        authTimeoutId = null;
+      }
+
+      // Configurar un listener único para este caso específico
+      const unsubscribe = authStore.subscribe((authState) => {
+        if (!authState.isLoading) {
+          unsubscribe(); // Remover este listener único
+
+          if (authState.isAuthenticated && authState.user) {
+            // Cancelar timeout ya que auth se resolvió exitosamente
+            if (authTimeoutId) {
+              clearTimeout(authTimeoutId);
+              authTimeoutId = null;
+            }
+            console.log('👥 MembersTab: Auth cargado exitosamente, cargando miembros');
+            loadWorkspaceMembers(workspaceId);
+          } else {
+            console.log('👥 MembersTab: Auth cargado pero usuario no autenticado');
+            showErrorMessage('Debes iniciar sesión para ver los miembros del workspace. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión</a>', false);
+          }
+        }
+      });
+
+      // Timeout de seguridad (10 segundos máximo)
+      authTimeoutId = setTimeout(() => {
+        unsubscribe();
+        console.log('👥 MembersTab: Timeout esperando auth, mostrando mensaje de error');
+        showErrorMessage('La autenticación está tardando más de lo esperado. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión</a>', false);
+        authTimeoutId = null;
+      }, 10000);
+
+    } else {
+      // Auth no está cargando y no hay usuario
+      console.log('👥 MembersTab: Auth no está cargando y no hay usuario, mostrando mensaje de error');
+      showErrorMessage('Debes iniciar sesión para ver los miembros del workspace. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión</a>', false);
+    }
+  }
+
+  // Función para generar enlace de invitación compartible
+  async function handleGenerateLink() {
+    console.log('🔗 Generando enlace de invitación compartible');
+
+    const currentState = dashboardView.get();
+    if (!currentState.selectedWorkspaceId) {
+      showErrorMessage('Error: No se puede generar enlace sin workspace seleccionado');
+      return;
+    }
+
+    try {
+      // Crear un enlace compartible usando la nueva función
+      const result = await createShareableLink(currentState.selectedWorkspaceId, 'Enlace compartible generado automáticamente');
+
+      if (result.success && result.invitationId && result.invitationLink) {
+        const invitationLink = result.invitationLink;
+
+        // Intentar copiar al portapapeles
+        try {
+          await navigator.clipboard.writeText(invitationLink);
+          showSuccessMessage('Enlace de invitación copiado al portapapeles. Comparte este enlace para invitar miembros.');
+          console.log('✅ Enlace generado y copiado:', invitationLink);
+        } catch (clipboardError) {
+          console.warn('⚠️ No se pudo copiar al portapapeles:', clipboardError);
+          // Fallback: mostrar el enlace para copiar manualmente
+          const copyManually = confirm(`Enlace generado exitosamente:\n\n${invitationLink}\n\n¿Quieres copiarlo manualmente? Presiona OK para abrir un campo de texto.`);
+
+          if (copyManually) {
+            // Crear un campo de texto temporal para copiar
+            const textArea = document.createElement('textarea');
+            textArea.value = invitationLink;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            textArea.setSelectionRange(0, 99999);
+
+            try {
+              document.execCommand('copy');
+              showSuccessMessage('Enlace copiado manualmente. Comparte este enlace para invitar miembros.');
+            } catch (fallbackError) {
+              console.warn('⚠️ Fallback también falló:', fallbackError);
+              showSuccessMessage(`Enlace generado: ${invitationLink} (cópialo manualmente)`);
+            } finally {
+              document.body.removeChild(textArea);
+            }
+          } else {
+            showSuccessMessage(`Enlace generado: ${invitationLink} (cópialo manualmente)`);
+          }
+        }
+      } else {
+        showErrorMessage(result.error || 'Error generando enlace de invitación');
+      }
+    } catch (error) {
+      console.error('❌ Error generando enlace:', error);
+      showErrorMessage('Error generando enlace de invitación');
+    }
+  }
+
+  // Función para invitar miembros (abrir modal)
+  function handleInviteMember() {
+    console.log('👥 Abriendo modal para invitar miembros');
+
+    const currentState = dashboardView.get();
+    if (!currentState.selectedWorkspaceId) {
+      showErrorMessage('Error: No se puede invitar miembros sin workspace seleccionado');
+      return;
+    }
+
+    // Usar la función global del modal
+    if (typeof (window as any).showInviteModal === 'function') {
+      (window as any).showInviteModal(currentState.selectedWorkspaceId);
+    } else {
+      showErrorMessage('Error: Modal de invitación no disponible');
+    }
+  }
+
   // Esperar a que el DOM esté listo
   function initializeComponent() {
+    console.log('👥 MembersTab: Inicializando componente...');
+
+    // Suscribirse a cambios del authStore para obtener el usuario actual
+    const authUnsubscribe = authStore.subscribe((authState) => {
+      console.log('👥 MembersTab: Auth state cambió:', authState.isAuthenticated);
+      const wasAuthenticated = !!currentUser;
+      currentUser = authState.user;
+
+      // Si acabamos de autenticar y estamos en vista de miembros, cargar miembros
+      if (!wasAuthenticated && authState.isAuthenticated && authState.user) {
+        const currentState = dashboardView.get();
+        if (currentState.currentView === 'members' && currentState.selectedWorkspaceId) {
+          console.log('👥 MembersTab: Usuario recién autenticado, cargando miembros para workspace:', currentState.selectedWorkspaceId);
+          loadWorkspaceMembers(currentState.selectedWorkspaceId);
+        }
+      }
+    });
+
     // Suscribirse a cambios del store para manejar visibilidad
-    dashboardView.subscribe((state) => {
-      console.log('� MembersTab: Dashboard store cambió:', state);
+    const dashboardUnsubscribe = dashboardView.subscribe((state) => {
+      console.log('👥 MembersTab: Dashboard store cambió:', state);
       handleVisibility(state);
     });
 
     // Verificar estado inicial
-    const initialState = dashboardView.get();
-    console.log('� MembersTab: Estado inicial del store:', initialState);
-    handleVisibility(initialState);
+    const initialAuthState = authStore.getState();
+    console.log('👥 MembersTab: Estado inicial de auth:', initialAuthState.isAuthenticated);
+    currentUser = initialAuthState.user;
+
+    const initialDashboardState = dashboardView.get();
+    console.log('👥 MembersTab: Estado inicial del dashboard:', initialDashboardState);
+
+    // Si el estado inicial ya requiere cargar miembros, hacerlo
+    if (initialDashboardState.currentView === 'members' && initialDashboardState.selectedWorkspaceId) {
+      console.log('👥 MembersTab: Estado inicial requiere cargar miembros');
+      handleVisibility(initialDashboardState);
+    }
+
+    // Configurar event listeners para los botones
+    const generateLinkBtn = document.getElementById('generate-link-btn');
+    const inviteMemberBtn = document.getElementById('invite-member-btn');
+
+    if (generateLinkBtn) {
+      generateLinkBtn.addEventListener('click', handleGenerateLink);
+      console.log('👥 MembersTab: Event listener configurado para generate-link-btn');
+    }
+
+    if (inviteMemberBtn) {
+      inviteMemberBtn.addEventListener('click', handleInviteMember);
+      console.log('👥 MembersTab: Event listener configurado para invite-member-btn');
+    }
+
+    // Almacenar referencias para cleanup si es necesario
+    (window as any).membersTabUnsubscribers = { authUnsubscribe, dashboardUnsubscribe };
   }
 
   // Inicializar cuando el DOM esté listo
@@ -122,12 +302,16 @@
       return;
     }
 
-    // Verificar si el usuario está autenticado
-    if (!currentUser) {
-      console.log('🔒 Usuario no autenticado, mostrando mensaje de autenticación');
-      showErrorMessage('Debes iniciar sesión para ver los miembros del workspace. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión</a>', false);
+    // Verificar que el usuario esté autenticado (obtener del store directamente)
+    const authState = authStore.getState();
+    if (!authState.isAuthenticated || !authState.user) {
+      console.error('❌ Usuario no autenticado en loadWorkspaceMembers');
+      showErrorMessage('Error de autenticación. Por favor, recarga la página.', true);
       return;
     }
+
+    // Actualizar la variable global currentUser
+    currentUser = authState.user;
 
     // Si es el mismo workspaceId, no recargar
     if (currentWorkspaceId === workspaceId) {
@@ -257,123 +441,4 @@
 
     console.log('✅ Miembros renderizados exitosamente');
   }
-
-  // Función para invitar miembros
-  function inviteMember(email: string) {
-    console.log('🎯 Invitando miembro:', email);
-    // Implementar lógica de invitación
-  }
-
-  // Escuchar cambios de workspace desde el store del dashboard
-  function setupDashboardStoreListener() {
-    // Suscribirse a cambios en el store del dashboard
-    const unsubscribe = dashboardView.subscribe((state) => {
-      console.log('📡 Dashboard store cambió:', state);
-      
-      // Solo procesar si estamos en la vista de miembros
-      if (state.currentView === 'members' && state.selectedWorkspaceId) {
-        console.log('👥 Vista de miembros seleccionada, cargando workspace:', state.selectedWorkspaceId);
-        loadWorkspaceMembers(state.selectedWorkspaceId);
-      }
-    });
-
-    // Verificar estado inicial
-    const initialState = dashboardView.get();
-    if (initialState.currentView === 'members' && initialState.selectedWorkspaceId) {
-      console.log('� Estado inicial: vista de miembros con workspace:', initialState.selectedWorkspaceId);
-      loadWorkspaceMembers(initialState.selectedWorkspaceId);
-    }
-
-    return unsubscribe;
-  }
-
-  // Configurar listener de autenticación
-  function setupAuthListener() {
-    onAuthStateChanged(auth, (user) => {
-      console.log('👤 Estado de autenticación cambió:', user ? 'Autenticado' : 'No autenticado', user?.uid);
-      currentUser = user;
-
-      // Si el usuario se autenticó y tenemos un workspaceId, recargar miembros
-      if (user && currentWorkspaceId) {
-        console.log('🔄 Usuario autenticado, recargando miembros para workspace:', currentWorkspaceId);
-        loadWorkspaceMembers(currentWorkspaceId);
-      }
-      // Si el usuario se desautenticó, mostrar mensaje de autenticación requerida
-      else if (!user && currentWorkspaceId) {
-        showErrorMessage('Tu sesión ha expirado. <a href="/login" class="text-blue-600 hover:text-blue-800">Haz clic aquí para iniciar sesión nuevamente</a>', false);
-      }
-
-      // Si el usuario se autenticó y estamos en vista de miembros, verificar si necesitamos cargar
-      if (user) {
-        const currentState = dashboardView.get();
-        if (currentState.currentView === 'members' && currentState.selectedWorkspaceId && currentWorkspaceId !== currentState.selectedWorkspaceId) {
-          console.log('🔄 Usuario autenticado y vista de miembros activa, cargando workspace:', currentState.selectedWorkspaceId);
-          loadWorkspaceMembers(currentState.selectedWorkspaceId);
-        }
-      }
-    });
-  }
-
-  // Verificar si ya hay un usuario autenticado al inicializar
-  function checkInitialAuthState() {
-    if (auth.currentUser) {
-      console.log('🔥 Usuario ya autenticado al inicializar:', auth.currentUser.uid);
-      currentUser = auth.currentUser;
-
-      // Verificar inmediatamente el estado del store
-      const currentState = dashboardView.get();
-      console.log('🔍 Estado del store al inicializar:', {
-        currentView: currentState.currentView,
-        selectedWorkspaceId: currentState.selectedWorkspaceId
-      });
-
-      // Si estamos en vista de miembros y hay un workspace seleccionado, cargar inmediatamente
-      if (currentState.currentView === 'members' && currentState.selectedWorkspaceId) {
-        console.log('� Inicializando con vista de miembros activa, cargando workspace:', currentState.selectedWorkspaceId);
-        loadWorkspaceMembers(currentState.selectedWorkspaceId);
-      }
-    } else {
-      console.log('🔥 No hay usuario autenticado al inicializar, esperando...');
-    }
-  }
-
-  // Inicializar cuando el DOM esté listo
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('🏁 Inicializando MembersTab...');
-    
-    // Inicializar en orden específico para asegurar timing correcto
-    checkInitialAuthState();
-    setupAuthListener();
-    setupDashboardStoreListener();
-
-    // Verificación final después de un breve delay para asegurar que todo esté inicializado
-    setTimeout(() => {
-      const currentState = dashboardView.get();
-      console.log('🔍 Verificación final del estado después de inicialización:', {
-        currentView: currentState.currentView,
-        selectedWorkspaceId: currentState.selectedWorkspaceId,
-        hasUser: !!currentUser,
-        currentWorkspaceId: currentWorkspaceId
-      });
-
-      // Si todo está listo y estamos en vista de miembros, cargar inmediatamente
-      if (currentState.currentView === 'members' && currentState.selectedWorkspaceId && currentUser) {
-        if (currentWorkspaceId !== currentState.selectedWorkspaceId) {
-          console.log('� Carga final: Detectado workspace en vista de miembros, cargando:', currentState.selectedWorkspaceId);
-          loadWorkspaceMembers(currentState.selectedWorkspaceId);
-        } else {
-          console.log('🔄 Carga final: Workspace ya cargado, omitiendo');
-        }
-      } else {
-        console.log('⏳ Carga final: Condiciones no cumplidas para carga automática');
-      }
-    }, 200);
-  });
-
-  // Exponer funciones globalmente para el componente padre
-  (window as any).MembersTab = {
-    loadWorkspaceMembers,
-    inviteMember
-  };
-</script></content>
-<parameter name="filePath">c:\Users\Wil\Desktop\ProyectoGestor\GestorProyectosClone\Gestor-de-Tareas-Mock\src\components\dashboard\MembersTab.astro
+</script>

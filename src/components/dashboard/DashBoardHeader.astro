@@ -53,15 +53,16 @@
       <button class="p-2 hover:bg-gray-100 rounded">
         <!-- Icono de ayuda -->
       </button>
-     
+
       <div class="relative">
         <button
           id="userMenuBtn"
-          class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center font-bold text-sm text-black hover:bg-yellow-400 transition-colors cursor-pointer"
+          class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center font-bold text-sm text-white hover:bg-gray-500 transition-colors cursor-pointer"
+          title="Menú de usuario"
         >
-          <span id="userAvatarButton">YR</span>
+          <span id="userAvatarButton">U</span>
         </button>
-        
+
         <div
           id="userMenu"
           class="hidden absolute right-0 mt-2 w-80 bg-white text-black rounded-lg shadow-xl border z-50"
@@ -70,9 +71,9 @@
             <div class="flex items-center space-x-3">
               <div
                 id="userAvatarMenu"
-                class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center font-bold"
+                class="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center font-bold text-white"
               >
-                YR
+                U
               </div>
               <div>
                 <div id="userDisplayName" class="font-semibold">Cargando...</div>
@@ -82,7 +83,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- // Sección DASHUP simplificada (igual que imagen 2) -->
           <div class="border-t py-2">
             <div
@@ -97,7 +98,7 @@
               >Tarjetas</a
             >
           </div>
-          
+
           <!-- // Crear Espacio de trabajo (mantenido) -->
           <div class="border-t py-2">
             <button
@@ -120,7 +121,7 @@
               Crear Espacio de trabajo
             </button>
           </div>
-          
+
           <!-- // Cerrar sesión (mantenido) -->
           <div class="border-t py-2">
             <button
@@ -135,4 +136,139 @@
     </div>
   </div>
 </header>
+
+<script>
+  import { authStore } from '../../stores/auth.store';
+  import { getInitials } from '../../scripts/shared/auth-init';
+  import { signOut } from 'firebase/auth';
+  import { auth } from '../../firebase/client-config';
+
+  // Función para actualizar la UI del usuario
+  function updateUserUI(user: any) {
+    if (!user) {
+      // Usuario no autenticado
+      updateUserDisplay('U', 'No autenticado', 'Inicia sesión');
+      return;
+    }
+
+    // Obtener iniciales
+    const initials = getInitials(user.displayName, user.email);
+
+    // Actualizar elementos del DOM
+    updateUserDisplay(
+      initials,
+      user.displayName || user.email?.split('@')[0] || 'Usuario',
+      user.email || ''
+    );
+  }
+
+  // Función helper para actualizar elementos del DOM
+  function updateUserDisplay(initials: string, displayName: string, email: string) {
+    // Avatar en el botón
+    const avatarButton = document.getElementById('userAvatarButton');
+    if (avatarButton) {
+      avatarButton.textContent = initials;
+    }
+
+    // Avatar en el menú
+    const avatarMenu = document.getElementById('userAvatarMenu');
+    if (avatarMenu) {
+      avatarMenu.textContent = initials;
+    }
+
+    // Nombre en el menú
+    const displayNameEl = document.getElementById('userDisplayName');
+    if (displayNameEl) {
+      displayNameEl.textContent = displayName;
+    }
+
+    // Email en el menú
+    const emailEl = document.getElementById('userEmail');
+    if (emailEl) {
+      emailEl.textContent = email;
+    }
+  }
+
+  // Función para manejar el logout
+  async function handleLogout() {
+    try {
+      await signOut(auth);
+      console.log('✅ Sesión cerrada exitosamente');
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('❌ Error cerrando sesión:', error);
+      // Mostrar toast de error si existe
+      if ((window as any).showToast) {
+        (window as any).showToast({
+          message: 'Error al cerrar sesión',
+          type: 'error'
+        });
+      }
+    }
+  }
+
+  // Función para toggle del menú de usuario
+  function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    if (menu) {
+      menu.classList.toggle('hidden');
+    }
+  }
+
+  // Inicializar cuando el DOM esté listo
+  function initUserMenu() {
+    console.log('👤 Inicializando menú de usuario...');
+
+    // Suscribirse a cambios del authStore
+    authStore.subscribe((state) => {
+      updateUserUI(state.user);
+    });
+
+    // Estado inicial
+    const initialState = authStore.getState();
+    updateUserUI(initialState.user);
+
+    // Configurar event listeners
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    if (userMenuBtn) {
+      userMenuBtn.addEventListener('click', toggleUserMenu);
+    }
+
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', handleLogout);
+    }
+
+    // Cerrar menú al hacer click fuera
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('userMenu');
+      const button = document.getElementById('userMenuBtn');
+
+      if (menu && button && !menu.contains(e.target as Node) && !button.contains(e.target as Node)) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    // Configurar botón de crear workspace (delegar al dashboard)
+    const createWorkspaceBtn = document.getElementById('create-workspace-menu-btn');
+    if (createWorkspaceBtn) {
+      createWorkspaceBtn.addEventListener('click', () => {
+        // Disparar evento para que el dashboard maneje la creación
+        document.dispatchEvent(new CustomEvent('create-workspace-requested'));
+        // Cerrar menú
+        const menu = document.getElementById('userMenu');
+        if (menu) menu.classList.add('hidden');
+      });
+    }
+
+    console.log('👤 Menú de usuario inicializado');
+  }
+
+  // Inicializar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUserMenu);
+  } else {
+    initUserMenu();
+  }
+</script>
 

@@ -35,6 +35,8 @@ const { title = 'TaskFlow' } = Astro.props;
 		<script type="module" is:inline>
 			// Importar Firebase primero para inicialización
 			import '/src/firebase/client-config.ts';
+			// Importar inicialización de autenticación
+			import '/src/scripts/shared/auth-init.ts';
 			// Importar navegación SPA
 			import '/src/scripts/shared/spa-navigation.ts';
 			// Importar sistema de toast

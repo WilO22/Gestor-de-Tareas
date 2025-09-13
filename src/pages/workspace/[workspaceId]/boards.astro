@@ -5,6 +5,11 @@ import UnifiedLayout from '../../../layouts/UnifiedLayout.astro';
 import CreateBoardModal from '../../../components/board/CreateBoardModal.astro';
 import BoardGrid from '../../../components/shared/BoardGrid.astro';
 const { workspaceId } = Astro.params;
+
+// Validar que workspaceId existe
+if (!workspaceId) {
+	throw new Error('Workspace ID is required');
+}
 ---
 
 <UnifiedLayout title="Tableros del Espacio de Trabajo">
@@ -34,6 +39,14 @@ const { workspaceId } = Astro.params;
 
 	// Inicializar la vista de boards cuando el DOM esté listo
 	document.addEventListener('DOMContentLoaded', () => {
-		initBoardGrid('boards-grid', workspaceId, true, false);
+		// workspaceId ya está validado en el frontmatter, pero por seguridad
+		const workspaceId = new URLSearchParams(window.location.pathname.split('/').pop() || '').get('workspaceId') ||
+		                   window.location.pathname.split('/').filter(Boolean).pop();
+
+		if (workspaceId) {
+			initBoardGrid('boards-grid', workspaceId, true, false);
+		} else {
+			console.error('No se pudo obtener el workspaceId');
+		}
 	});
 </script>
